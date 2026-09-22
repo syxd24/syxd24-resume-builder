@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "document": {
+    "language": "en-GB",
+    "dateFormat": "DD/MM/YYYY",
+    "pageFormat": "A4"
+  },
+  "layout": {
+    "mode": "one-column",
+    "secondaryWidthPct": 32,
+    "columnGapMm": 6
+  },
+  "typography": {
+    "bodyFont": "Alegreya",
+    "nameFont": "inherit",
+    "baseSizePt": 10.5,
+    "nameOffsetPt": 11,
+    "sectionHeadingOffsetPt": 3,
+    "entryHeaderOffsetPt": 0,
+    "lineHeight": 1.15
+  },
+  "spacing": {
+    "marginTopMm": 12,
+    "marginRightMm": 12,
+    "marginBottomMm": 12,
+    "marginLeftMm": 12,
+    "headerGapMm": 4,
+    "sectionGapMm": 4,
+    "headingGapMm": 2,
+    "entryGapMm": 2.5,
+    "paragraphGapMm": 1.5
+  },
+  "entries": {
+    "metadataAlign": "right",
+    "descriptionIndent": false,
+    "experienceTitleFirst": true,
+    "educationDegreeFirst": true
+  },
+  "headings": {
+    "style": "rule",
+    "iconMode": "none"
+  },
+  "colors": {
+    "body": "#171717",
+    "secondary": "#4B5563",
+    "accent": "#244E64",
+    "heading": "#171717",
+    "border": "#244E64",
+    "headerBackground": "#FFFFFF",
+    "link": "#244E64",
+    "accentTargets": {
+      "name": true,
+      "jobTitle": false,
+      "headings": false,
+      "icons": true,
+      "links": true,
+      "skillIndicators": true,
+      "rules": true
+    }
+  },
+  "header": {
+    "alignment": "center",
+    "detailsArrangement": "inline-wrap",
+    "lineStyle": "none",
+    "showIcons": true
+  },
+  "photo": {
+    "visible": false,
+    "shape": "circle",
+    "sizeMm": 24,
+    "grayscale": false,
+    "zoom": 1,
+    "x": 0.5,
+    "y": 0.5
+  },
+  "links": {
+    "underline": false,
+    "colorMode": "inherit",
+    "showIcons": true
+  },
+  "footer": {
+    "pageNumbers": false,
+    "showName": false,
+    "showEmail": false
+  },
+  "sections": {}
+}
