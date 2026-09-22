@@ -4,11 +4,12 @@
 Personal, single-owner resume builder with a FlowCV-like desktop workflow and editing depth.
 
 ## Locked decisions
-- No user-facing login or account system.
+- No application-level user-facing login/account system.
+- Production must be private through Vercel Authentication / Deployment Protection rather than exposing the personal dashboard publicly.
 - No public resume webpage/share URL.
 - PDF download is required.
 - PDF sharing means producing a clean downloadable PDF the owner can send anywhere; no hosted public CV page is required.
-- Import existing resume is required: PDF, DOCX, TXT. Import should prefill editable structured resume content and preserve the original source file.
+- Import existing resume is required: PDF, DOCX, TXT. Import should prefill editable structured resume content and preserve the original source file privately.
 - Desktop editor only for v1.
 - Vercel Free deployment.
 - Supabase Free for persistence/storage.
@@ -24,7 +25,9 @@ Initial schema already exists remotely:
 - private bucket `resume-assets`
 - private bucket `resume-imports`
 
-RLS is enabled and anon/authenticated table grants are revoked. The web app must access Supabase from trusted server-side code only.
+RLS is enabled and anon/authenticated table grants are revoked. The web app must access Supabase from trusted server-side code only. Security advisor currently reports only the expected informational notice that RLS-enabled tables have no client policies; this is intentional because browser roles have no table access.
+
+Repository migrations reproduce the remote foundation under `supabase/migrations/`.
 
 ## Canonical ownership contracts to create during foundation
 - Resume schema: `src/domain/resume/schema.ts`
@@ -57,15 +60,34 @@ Screenshots show:
 - Header controls shown: text alignment, details arrangement, line style and advanced settings.
 - Photo, Link Styling, Footer and Section Customizations are visible as separate configurable groups.
 
-Two real one-page CV PDFs were supplied and must be used as realistic regression fixtures: Syed Suhel Ahmed and Jana Szefler.
+Two real one-page CV PDFs were supplied during specification and used to derive realistic section-density requirements. Because the GitHub repository is public, personal contact details/source PDFs are not committed; `fixtures/golden-resume.json` is anonymized but preserves similar density and section variety.
+
+## Repository readiness
+The repository now contains:
+- root Codex instructions
+- locked scope/product/editor/dashboard/renderer/import specifications
+- FlowCV settings/evidence map
+- canonical domain-schema requirements
+- database/storage contract and migrations
+- visual/interaction specs
+- feature matrix and acceptance tests
+- credit-efficient multi-agent orchestration
+- scoped Codex Skills
+- anonymized golden resume/default design fixtures
+- environment/security/deployment guidance
+- `CODEX_KICKOFF.md`
+- GitHub issue #1 as the implementation entry point
 
 ## Current milestone status
 - Product evidence: sufficient for v1 specification.
-- Supabase foundation: created remotely.
-- Repository specification: in progress.
+- Supabase foundation: complete remotely and documented.
+- Repository specification/agent architecture: complete for v1 kickoff.
 - Application foundation: pending Codex.
-- Dashboard: pending.
-- Editor: pending.
-- Renderer/PDF: pending.
-- Import: pending.
-- QA: pending.
+- Dashboard: pending Codex.
+- Editor: pending Codex.
+- Renderer/PDF: pending Codex.
+- Import: pending Codex.
+- QA: pending Codex.
+
+## Next action
+Launch Codex on this repository and execute `CODEX_KICKOFF.md` / issue #1 using `$resume-builder-orchestrator`.
