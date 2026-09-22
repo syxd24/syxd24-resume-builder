@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# environment / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# tests / generated
+playwright-report/
+test-results/
+coverage/
+
+# local tooling
+.DS_Store
+*.log
+.vercel/
+
+# generated PDFs/import scratch
+.tmp/
+tmp/
