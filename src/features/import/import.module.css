@@ -1,0 +1,22 @@
+.page { min-height: 100vh; padding: 48px 24px; background: #f4f1eb; color: #201c35; }
+.shell { width: min(760px, 100%); margin: 0 auto; }
+.back { display: inline-flex; margin-bottom: 24px; color: #554f6b; font-weight: 700; text-decoration: none; }
+.card { padding: 44px; border: 1px solid #e1dce8; border-radius: 24px; background: #fff; box-shadow: 0 22px 60px rgb(45 38 67 / 10%); }
+.icon { display: grid; width: 52px; height: 52px; place-items: center; border-radius: 16px; background: #eee8ff; color: #5b35b8; font-size: 28px; }
+.eyebrow { margin: 24px 0 8px; color: #6b3fd1; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.card h1 { margin: 0; font-size: clamp(30px, 5vw, 44px); letter-spacing: -.04em; }
+.lead { max-width: 620px; margin: 16px 0 28px; color: #625c72; font-size: 17px; line-height: 1.6; }
+.dropzone { display: grid; min-height: 180px; place-items: center; align-content: center; gap: 8px; border: 2px dashed #b9accf; border-radius: 18px; background: #faf8fd; cursor: pointer; text-align: center; }
+.dropzone:hover { border-color: #6b3fd1; background: #f7f2ff; }
+.dropzone[data-busy="true"] { cursor: wait; opacity: .75; }
+.dropzone input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.dropzone strong { font-size: 18px; }
+.dropzone span { color: #777083; }
+.error { margin-top: 20px; padding: 18px; border: 1px solid #f0b8bd; border-radius: 14px; background: #fff5f5; color: #7a1b27; }
+.error p { margin: 6px 0 14px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions button { min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: #7a1b27; color: #fff; cursor: pointer; font-weight: 750; }
+.actions .secondary { border: 1px solid #d5a2a8; background: #fff; color: #7a1b27; }
+.notes { display: grid; gap: 10px; margin-top: 24px; color: #625c72; font-size: 14px; line-height: 1.55; }
+.notes p { margin: 0; }
+@media (max-width: 640px) { .page { padding: 20px 12px; } .card { padding: 26px 20px; border-radius: 18px; } }

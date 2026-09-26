@@ -1,0 +1,381 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent } from "react";
+import type { ResumeDocument, ResumeSection } from "@/domain/resume/schema";
+import {
+  appendEntry,
+  copyEntry,
+  moveEntry,
+  removeEntry,
+  removeSection,
+  updateEntry,
+  updateSectionSettings,
+} from "./document-operations";
+import { hasSubstantialContent } from "./editor-utils";
+import { DateEditor, TextField } from "./FieldControls";
+import { EntryEditor } from "./EntryEditor";
+import { RichTextEditor } from "./RichTextEditor";
+import type { ContentEditorChangeMeta, EntrySection, ResumeEntry } from "./types";
+import styles from "./content-editor.module.css";
+
+type SectionCardProps = {
+  document: ResumeDocument;
+  section: ResumeSection;
+  index: number;
+  total: number;
+  onChange: (document: ResumeDocument, meta: ContentEditorChangeMeta) => void;
+  onMove: (from: number, to: number) => void;
+  onSectionDragStart: (index: number) => void;
+  onSectionDragEnd: () => void;
+  onSectionDrop: (index: number) => void;
+  dragging: boolean;
+  initiallyExpanded?: boolean;
+};
+
+const SECTION_CODES: Record<ResumeSection["type"], string> = {
+  summary: "PR",
+  experience: "EX",
+  education: "ED",
+  skills: "SK",
+  languages: "LA",
+  certificates: "CE",
+  interests: "IN",
+  projects: "PJ",
+  courses: "CO",
+  awards: "AW",
+  organisations: "OR",
+  publications: "PU",
+  references: "RE",
+  declaration: "DE",
+  custom: "CU",
+};
+
+function entryLabel(entry: ResumeEntry, index: number): string {
+  if ("position" in entry) return entry.position || entry.employer || `Experience ${index + 1}`;
+  if ("degree" in entry) return entry.degree || entry.institution || `Education ${index + 1}`;
+  if ("name" in entry) return entry.name || `Entry ${index + 1}`;
+  if ("title" in entry) return entry.title || `Entry ${index + 1}`;
+  return `Entry ${index + 1}`;
+}
+
+function EntryCard({
+  document,
+  section,
+  entry,
+  index,
+  expanded,
+  onToggle,
+  onChange,
+  dragIndex,
+  setDragIndex,
+  shouldFocus,
+  onFocused,
+}: {
+  document: ResumeDocument;
+  section: EntrySection;
+  entry: ResumeEntry;
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: (document: ResumeDocument, meta: ContentEditorChangeMeta) => void;
+  dragIndex: number | null;
+  setDragIndex: (index: number | null) => void;
+  shouldFocus: boolean;
+  onFocused: () => void;
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const label = entryLabel(entry, index);
+  const entryCount = section.entries.length;
+
+  useEffect(() => {
+    if (!expanded || !shouldFocus) return;
+    bodyRef.current?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
+    onFocused();
+  }, [expanded, onFocused, shouldFocus]);
+
+  const changeEntry = (next: ResumeEntry) => {
+    onChange(updateEntry(document, section.id, next), {
+      reason: "entry-update",
+      sectionId: section.id,
+      entryId: next.id,
+    });
+  };
+
+  const deleteEntry = () => {
+    if (hasSubstantialContent(entry) && !window.confirm(`Delete “${label}”? This cannot be undone.`)) return;
+    onChange(removeEntry(document, section.id, entry.id), {
+      reason: "entry-delete",
+      sectionId: section.id,
+      entryId: entry.id,
+    });
+  };
+
+  const duplicate = () => {
+    const result = copyEntry(document, section.id, entry.id);
+    onChange(result.document, {
+      reason: "entry-duplicate",
+      sectionId: section.id,
+      entryId: result.entry?.id,
+    });
+  };
+
+  const drop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (dragIndex === null || dragIndex === index) return;
+    onChange(moveEntry(document, section.id, dragIndex, index), {
+      reason: "entry-reorder",
+      sectionId: section.id,
+      entryId: entry.id,
+    });
+    setDragIndex(null);
+  };
+
+  return (
+    <article
+      className={`${styles.entryCard} ${entry.visible ? "" : styles.muted}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={drop}
+    >
+      <header className={styles.entryHeader}>
+        <button
+          type="button"
+          draggable
+          className={styles.dragHandleButton}
+          aria-label={`Drag ${label} to reorder`}
+          title="Drag to reorder"
+          onDragStart={() => setDragIndex(index)}
+          onDragEnd={() => setDragIndex(null)}
+        >⠿</button>
+        <button
+          type="button"
+          className={styles.entryToggle}
+          aria-expanded={expanded}
+          aria-controls={`entry-${entry.id}`}
+          onClick={onToggle}
+        >
+          <span>{label}</span>
+          <small>{entry.visible ? "Visible" : "Hidden"}</small>
+        </button>
+        <div className={styles.rowControls}>
+          <button
+            type="button"
+            className={styles.iconButton}
+            disabled={index === 0}
+            aria-label={`Move ${label} up`}
+            onClick={() => onChange(moveEntry(document, section.id, index, index - 1), { reason: "entry-reorder", sectionId: section.id, entryId: entry.id })}
+          >↑</button>
+          <button
+            type="button"
+            className={styles.iconButton}
+            disabled={index === entryCount - 1}
+            aria-label={`Move ${label} down`}
+            onClick={() => onChange(moveEntry(document, section.id, index, index + 1), { reason: "entry-reorder", sectionId: section.id, entryId: entry.id })}
+          >↓</button>
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label={`${entry.visible ? "Hide" : "Show"} ${label}`}
+            title={`${entry.visible ? "Hide" : "Show"} entry`}
+            onClick={() => changeEntry({ ...entry, visible: !entry.visible } as ResumeEntry)}
+          >{entry.visible ? "◉" : "○"}</button>
+          <button type="button" className={styles.iconButton} aria-label={`Duplicate ${label}`} onClick={duplicate}>⧉</button>
+          <button type="button" className={styles.dangerIconButton} aria-label={`Delete ${label}`} onClick={deleteEntry}>×</button>
+        </div>
+      </header>
+      {expanded ? (
+        <div ref={bodyRef} id={`entry-${entry.id}`} className={styles.entryBody}>
+          <EntryEditor sectionType={section.type} entry={entry} onChange={changeEntry} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+export function SectionCard({
+  document,
+  section,
+  index,
+  total,
+  onChange,
+  onMove,
+  onSectionDragStart,
+  onSectionDragEnd,
+  onSectionDrop,
+  dragging,
+  initiallyExpanded = false,
+}: SectionCardProps) {
+  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [renaming, setRenaming] = useState(false);
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
+  const [dragEntryIndex, setDragEntryIndex] = useState<number | null>(null);
+  const [focusEntryId, setFocusEntryId] = useState<string>();
+  const entrySection = "entries" in section ? section : undefined;
+  const entryCount = entrySection?.entries.length ?? 0;
+  const status = useMemo(() => {
+    if (!section.visible) return "Hidden from resume";
+    if (entrySection) return `${entryCount} ${entryCount === 1 ? "entry" : "entries"}`;
+    return section.type === "summary" ? "Profile text" : "Declaration text";
+  }, [entryCount, entrySection, section.type, section.visible]);
+
+  const updateSettings = (patch: Parameters<typeof updateSectionSettings>[2]) => {
+    onChange(updateSectionSettings(document, section.id, patch), {
+      reason: "section-update",
+      sectionId: section.id,
+    });
+  };
+
+  const deleteSection = () => {
+    if (!window.confirm(`Delete the “${section.heading}” section? This cannot be undone.`)) return;
+    onChange(removeSection(document, section.id), {
+      reason: "section-delete",
+      sectionId: section.id,
+    });
+  };
+
+  const addEntry = () => {
+    const result = appendEntry(document, section.id);
+    if (result.entry) {
+      setExpandedEntries((current) => new Set(current).add(result.entry!.id));
+      setFocusEntryId(result.entry.id);
+    }
+    onChange(result.document, {
+      reason: "entry-add",
+      sectionId: section.id,
+      entryId: result.entry?.id,
+    });
+  };
+
+  return (
+    <section
+      className={`${styles.card} ${section.visible ? "" : styles.muted} ${dragging ? styles.dragging : ""}`}
+      aria-labelledby={`section-title-${section.id}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        onSectionDrop(index);
+      }}
+    >
+      <header className={styles.cardHeader}>
+        <button
+          type="button"
+          draggable
+          className={styles.dragHandleButton}
+          aria-label={`Drag ${section.heading} section to reorder`}
+          title="Drag to reorder"
+          onDragStart={() => onSectionDragStart(index)}
+          onDragEnd={onSectionDragEnd}
+        >⠿</button>
+        <button
+          type="button"
+          className={styles.sectionToggle}
+          aria-expanded={expanded}
+          aria-controls={`section-body-${section.id}`}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <span className={styles.sectionIcon} aria-hidden="true">{SECTION_CODES[section.type]}</span>
+          <span className={styles.sectionHeadingText}>
+            <strong id={`section-title-${section.id}`}>{section.heading}</strong>
+            <small>{status}</small>
+          </span>
+          <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span>
+        </button>
+        <div className={styles.rowControls}>
+          <button type="button" className={styles.iconButton} disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label={`Move ${section.heading} section up`}>↑</button>
+          <button type="button" className={styles.iconButton} disabled={index === total - 1} onClick={() => onMove(index, index + 1)} aria-label={`Move ${section.heading} section down`}>↓</button>
+          <button type="button" className={styles.iconButton} onClick={() => updateSettings({ visible: !section.visible })} aria-label={`${section.visible ? "Hide" : "Show"} ${section.heading} section`}>{section.visible ? "◉" : "○"}</button>
+        </div>
+      </header>
+
+      {expanded ? (
+        <div id={`section-body-${section.id}`} className={styles.cardBody}>
+          <div className={styles.sectionSettings}>
+            {renaming ? (
+              <div className={styles.renameRow}>
+                <TextField label="Section heading" value={section.heading} onChange={(heading) => {
+                  if (heading.trim()) updateSettings({ heading });
+                }} />
+                <button type="button" className={styles.secondaryButton} onClick={() => setRenaming(false)}>Done</button>
+              </div>
+            ) : (
+              <button type="button" className={styles.textButton} onClick={() => setRenaming(true)}>Edit heading</button>
+            )}
+            <label className={styles.compactField}>
+              <span>Column placement</span>
+              <select value={section.column} onChange={(event) => updateSettings({ column: event.target.value as ResumeSection["column"] })}>
+                <option value="full">Full width</option>
+                <option value="primary">Primary column</option>
+                <option value="secondary">Secondary column</option>
+              </select>
+            </label>
+            {section.type !== "summary" ? (
+              <button type="button" className={styles.dangerTextButton} onClick={deleteSection}>Delete section</button>
+            ) : null}
+          </div>
+
+          {section.type === "summary" ? (
+            <RichTextEditor
+              label="Profile summary"
+              value={section.content}
+              onChange={(content) => onChange(
+                { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, content } : candidate) },
+                { reason: "section-update", sectionId: section.id },
+              )}
+            />
+          ) : null}
+
+          {section.type === "declaration" ? (
+            <>
+              <RichTextEditor
+                label="Declaration"
+                value={section.text}
+                onChange={(text) => onChange(
+                  { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, text } : candidate) },
+                  { reason: "section-update", sectionId: section.id },
+                )}
+              />
+              <div className={styles.formGrid}>
+                <TextField label="Place" value={section.place} onChange={(place) => onChange(
+                  { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, place } : candidate) },
+                  { reason: "section-update", sectionId: section.id },
+                )} />
+                <DateEditor label="Date" value={section.date} onChange={(date) => onChange(
+                  { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, date } : candidate) },
+                  { reason: "section-update", sectionId: section.id },
+                )} />
+              </div>
+            </>
+          ) : null}
+
+          {entrySection ? (
+            <div className={styles.entries}>
+              {entrySection.entries.map((entry, entryIndex) => (
+                <EntryCard
+                  key={entry.id}
+                  document={document}
+                  section={entrySection}
+                  entry={entry}
+                  index={entryIndex}
+                  expanded={expandedEntries.has(entry.id)}
+                  onToggle={() => setExpandedEntries((current) => {
+                    const next = new Set(current);
+                    if (next.has(entry.id)) next.delete(entry.id);
+                    else next.add(entry.id);
+                    return next;
+                  })}
+                  onChange={onChange}
+                  dragIndex={dragEntryIndex}
+                  setDragIndex={setDragEntryIndex}
+                  shouldFocus={focusEntryId === entry.id}
+                  onFocused={() => setFocusEntryId(undefined)}
+                />
+              ))}
+              {entrySection.entries.length === 0 ? <p className={styles.emptyHint}>No entries yet. Add the first one below.</p> : null}
+              <button type="button" className={styles.addEntryButton} onClick={addEntry}>+ Add entry</button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}

@@ -82,12 +82,18 @@ The repository now contains:
 - Product evidence: sufficient for v1 specification.
 - Supabase foundation: complete remotely and documented.
 - Repository specification/agent architecture: complete for v1 kickoff.
-- Application foundation: pending Codex.
-- Dashboard: pending Codex.
-- Editor: pending Codex.
-- Renderer/PDF: pending Codex.
-- Import: pending Codex.
-- QA: pending Codex.
+- Application foundation: complete (2026-09-22). Next.js/strict TypeScript, pinned dependencies/lockfile, server-only environment and Supabase client, canonical Zod domain/design contracts, typed repositories with `lock_version` conflict protection, CRUD/autosave API contracts, import/export interfaces, and Vitest/Playwright/lint scaffolding are in place.
+- Foundation gates: TypeScript, lint, 8 unit tests, production build, and the 1-test Chromium shell smoke check pass.
+- Locked interfaces: `src/domain/resume/schema.ts`, `src/domain/resume/design-schema.ts`, and `src/data/resumes/` are coordinator-owned after Foundation; feature workers must propose changes rather than edit them concurrently.
+- Dashboard: implemented with persisted CRUD, real shared-renderer thumbnails, loading/error states, and direct PDF download.
+- Editor: implemented with all content/customize controls, accessible ordering, photo workflow, live preview, and serialized 750 ms optimistic autosave with retry.
+- Renderer/PDF: implemented as one semantic A4/Letter renderer for preview/thumbnail/print, deterministic multipage splitting, private signed assets, and selectable-text Chromium PDF export.
+- Import: implemented for PDF/DOCX/TXT with private-source-first storage, conservative classification, fallback content preservation, and retry/delete failure handling.
+- Integration gates (2026-09-26): Next.js 16.3.6 production build passes with 14 routes; TypeScript and lint pass; 59 unit/component/persistence tests pass; `npm audit` reports zero vulnerabilities.
+- Persistence/security QA: complete for repository round trips, optimistic conflicts, stale autosave ordering, server-only secrets, private storage, anonymous denial, private import retention, and reference-aware photo cleanup. Live Supabase catalog/data probes passed against project `nfivvjwpxyelnrdayhbf`.
+- Visual/PDF QA: 11 Playwright checks pass across desktop/mobile dashboard, tablet/mobile editor, content/customize controls, golden renderer, seven-page stress renderer, and A4/Letter PDF generation. Semantic inspection confirms selectable text, embedded Palatino fonts, clickable links, page geometry, and preview/PDF page parity.
+- Responsive polish: dashboard and editor layouts adapt without horizontal document overflow at 390 px and 1024 px, controls wrap/stack cleanly, and interactive motion respects reduced-motion preferences.
+- Local acceptance automation: `tests/e2e/live-workflows.spec.ts` covers blank create, save/reload, duplicate, delete, PDF/DOCX/TXT import, photo upload, PDF export, and cleanup. It is intentionally gated by `npm run env:check` and cannot run until the ignored `.env.local` contains the server-only Supabase secret.
 
 ## Next action
-Launch Codex on this repository and execute `CODEX_KICKOFF.md` / issue #1 using `$resume-builder-orchestrator`.
+Add the modern Supabase `sb_secret_…` value to `.env.local`, run `npm run test:e2e:live`, then update the final feature matrix from that live localhost evidence and commit any resulting fixes.
