@@ -73,7 +73,7 @@ export function ContentEditor({
               setDragSectionIndex(null);
             }}
             dragging={dragSectionIndex === index}
-            initiallyExpanded={newSectionId === section.id || section.type === "summary"}
+            initiallyExpanded={newSectionId === section.id}
           />
         ))}
       </div>

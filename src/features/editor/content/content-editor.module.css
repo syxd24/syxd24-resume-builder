@@ -1,13 +1,14 @@
 .editor {
-  --content-ink: #202036;
+  --content-ink: #21152f;
   --content-muted: #6f7084;
   --content-border: #e5e4eb;
   --content-soft: #f6f5f8;
-  --content-accent: #6c4ee3;
-  --content-accent-dark: #5336c7;
+  --content-accent: #f00073;
+  --content-accent-dark: #c90061;
   display: grid;
   gap: 16px;
   width: 100%;
+  padding: 0 16px 32px;
   color: var(--content-ink);
 }
 
@@ -18,7 +19,7 @@
 }
 
 .editorIntro {
-  display: flex;
+  display: none;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
@@ -74,24 +75,27 @@
   padding: 0 18px;
   border: 1px solid var(--content-accent);
   border-radius: 10px;
-  background: var(--content-accent);
+  background: linear-gradient(135deg, #ef0073, #ff5d70);
   color: #fff;
   font-weight: 750;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 5px 16px rgb(76 54 181 / 18%);
+  box-shadow: 0 7px 18px rgb(239 0 115 / 18%);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
 .primaryButton:hover {
-  background: var(--content-accent-dark);
+  filter: saturate(1.05) brightness(.98);
+  box-shadow: 0 10px 24px rgb(239 0 115 / 24%);
+  transform: translateY(-1px);
 }
 
 .card {
   overflow: hidden;
-  border: 1px solid var(--content-border);
+  border: 1px solid #ebe8ed;
   border-radius: 16px;
   background: #fff;
-  box-shadow: 0 4px 18px rgb(34 33 48 / 5%);
+  box-shadow: 0 4px 14px rgb(34 20 45 / 5%);
   transition: border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
 }
 
@@ -113,8 +117,107 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 76px;
+  min-height: 74px;
   padding: 14px 18px;
+}
+
+.personalSummary {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  align-items: center;
+  min-height: 204px;
+  padding: 24px 26px;
+}
+
+.personalSummaryText {
+  align-self: start;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.personalSummary h2 {
+  overflow: hidden;
+  margin: 0 0 18px;
+  color: #210d32;
+  font-size: 1.22rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personalContacts {
+  display: grid;
+  gap: 13px;
+  color: #2f2240;
+  font-size: .88rem;
+}
+
+.personalContacts > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personalContacts > span > span {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  color: #311346;
+  font-size: .95rem;
+  font-weight: 800;
+}
+
+.personalContacts svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.personalPhotoPreview {
+  display: grid;
+  width: 100px;
+  height: 100px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #f1f0f3;
+  color: #b8b5bd;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.personalEditButton {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f00073;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.personalEditButton:hover {
+  background: #cf0063;
+  box-shadow: 0 6px 16px rgb(240 0 115 / 25%);
+  transform: translateY(-1px);
 }
 
 .sectionIdentity {
@@ -152,11 +255,21 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: #eeeafe;
-  color: var(--content-accent-dark);
+  background: #f2eafe;
+  color: #3c1756;
   font-size: 0.7rem;
   font-weight: 850;
   letter-spacing: 0.05em;
+}
+
+.sectionIcon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .cardBody {
@@ -413,6 +526,20 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.card:has(.sectionToggle[aria-expanded="false"]) > .cardHeader > .dragHandleButton,
+.card:has(.sectionToggle[aria-expanded="false"]) > .cardHeader > .rowControls {
+  display: none;
+}
+
+.sectionToggle[aria-expanded="false"] .sectionHeadingText small {
+  display: none;
+}
+
+.sectionToggle[aria-expanded="false"] .sectionHeadingText strong {
+  font-size: 1.02rem;
+  letter-spacing: -.01em;
 }
 
 .sectionHeadingText,
@@ -674,14 +801,24 @@
 .addContentFooter {
   display: flex;
   align-items: center;
+  justify-self: center;
   justify-content: center;
-  gap: 12px;
-  min-height: 64px;
-  border: 1px dashed #bdb5db;
-  border-radius: 14px;
-  background: rgb(255 255 255 / 58%);
-  color: #514482;
+  gap: 10px;
+  width: min(280px, 100%);
+  min-height: 58px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ef0073, #ff5d70);
+  color: #fff;
   cursor: pointer;
+  box-shadow: 0 8px 20px rgb(239 0 115 / 20%);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.addContentFooter:hover {
+  filter: saturate(1.05) brightness(.98);
+  box-shadow: 0 11px 26px rgb(239 0 115 / 25%);
+  transform: translateY(-1px);
 }
 
 .addContentFooter > span:first-child {
@@ -694,7 +831,7 @@
 }
 
 .addContentFooter small {
-  color: var(--content-muted);
+  color: rgb(255 255 255 / 78%);
   font-size: 0.7rem;
   font-weight: 500;
 }
@@ -878,6 +1015,21 @@
 
   .modal {
     padding: 18px;
+  }
+
+  .editor {
+    padding-inline: 10px;
+  }
+
+  .personalSummary {
+    grid-template-columns: minmax(0, 1fr) 72px;
+    min-height: 168px;
+    padding: 20px;
+  }
+
+  .personalPhotoPreview {
+    width: 72px;
+    height: 72px;
   }
 }
 

@@ -84,6 +84,7 @@ async function importThroughUi(
   trackCreated(payload);
   expect(payload.import).toMatchObject({ status: "completed", resumeId: payload.resume.id });
   await expect(page).toHaveURL(editorUrl(payload.resume.id));
+  await expandPersonalDetails(page);
   await expect(page.getByLabel("Full name")).toHaveValue(payload.resume.content.personal.fullName);
   return payload;
 }
@@ -92,6 +93,14 @@ async function expectPersisted(request: APIRequestContext, id: string): Promise<
   const response = await request.get(`/api/resumes/${id}`);
   expect(response.status(), await response.text()).toBe(200);
   return ((await response.json()) as ResumePayload).resume;
+}
+
+async function expandPersonalDetails(page: Page) {
+  const fullName = page.getByLabel("Full name");
+  if (!(await fullName.isVisible().catch(() => false))) {
+    await page.getByRole("button", { name: "Edit personal details" }).click();
+  }
+  await expect(fullName).toBeVisible();
 }
 
 async function downloadBytes(page: Page): Promise<{ bytes: Buffer; filename: string }> {
@@ -133,6 +142,7 @@ test.describe("live local acceptance", () => {
       expect(createdId).toMatch(new RegExp(`^${UUID}$`));
       if (!createdId) throw new Error("The blank resume route did not include an id.");
       createdResumeIds.add(createdId);
+      await expandPersonalDetails(page);
 
       const resumeTitle = `Live acceptance ${runId}`;
       const fullName = `Live Candidate ${runId}`;
@@ -147,6 +157,7 @@ test.describe("live local acceptance", () => {
       await expect(page.getByRole("status")).toHaveText("Saved");
 
       await page.reload();
+      await expandPersonalDetails(page);
       await expect(page.getByLabel("Resume title")).toHaveValue(resumeTitle);
       await expect(page.getByLabel("Full name")).toHaveValue(fullName);
       const persisted = await expectPersisted(request, createdId);
@@ -199,6 +210,7 @@ test.describe("live local acceptance", () => {
       expect(duplicate.title).toBe(`${resumeTitle} - Copy`);
       expect(duplicate.content.personal).toEqual(persistedWithPhoto.content.personal);
       await expect(page).toHaveURL(editorUrl(duplicate.id));
+      await expandPersonalDetails(page);
       await expect(page.getByLabel("Full name")).toHaveValue(fullName);
 
       page.once("dialog", (dialog) => void dialog.accept());

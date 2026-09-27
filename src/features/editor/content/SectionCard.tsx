@@ -33,23 +33,15 @@ type SectionCardProps = {
   initiallyExpanded?: boolean;
 };
 
-const SECTION_CODES: Record<ResumeSection["type"], string> = {
-  summary: "PR",
-  experience: "EX",
-  education: "ED",
-  skills: "SK",
-  languages: "LA",
-  certificates: "CE",
-  interests: "IN",
-  projects: "PJ",
-  courses: "CO",
-  awards: "AW",
-  organisations: "OR",
-  publications: "PU",
-  references: "RE",
-  declaration: "DE",
-  custom: "CU",
-};
+function SectionIcon({ type }: { type: ResumeSection["type"] }) {
+  if (type === "experience") return <svg viewBox="0 0 24 24"><path d="M4 8.5h16v10H4zM9 8.5V6h6v2.5M4 12.5h16M10 12.5v2h4v-2" /></svg>;
+  if (type === "education") return <svg viewBox="0 0 24 24"><path d="m3 9 9-4 9 4-9 4-9-4Zm3 2.2V16c3.7 2.7 8.3 2.7 12 0v-4.8M21 9v6" /></svg>;
+  if (type === "languages") return <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M4.5 12h15M12 4c2.8 3 2.8 13 0 16M12 4c-2.8 3-2.8 13 0 16" /></svg>;
+  if (type === "skills") return <svg viewBox="0 0 24 24"><path d="M9 4.5v4H5a2 2 0 1 0 0 4h4v4h4v-4h4a2 2 0 1 1 0-4h-4v-4H9Z" /></svg>;
+  if (type === "certificates" || type === "awards") return <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5" /><path d="m9 13-1 7 4-2 4 2-1-7" /></svg>;
+  if (type === "summary") return <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8M8 13h6" /></svg>;
+  return <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 9h6M9 13h6" /></svg>;
+}
 
 function entryLabel(entry: ResumeEntry, index: number): string {
   if ("position" in entry) return entry.position || entry.employer || `Experience ${index + 1}`;
@@ -273,7 +265,7 @@ export function SectionCard({
           aria-controls={`section-body-${section.id}`}
           onClick={() => setExpanded((current) => !current)}
         >
-          <span className={styles.sectionIcon} aria-hidden="true">{SECTION_CODES[section.type]}</span>
+          <span className={styles.sectionIcon} aria-hidden="true"><SectionIcon type={section.type} /></span>
           <span className={styles.sectionHeadingText}>
             <strong id={`section-title-${section.id}`}>{section.heading}</strong>
             <small>{status}</small>

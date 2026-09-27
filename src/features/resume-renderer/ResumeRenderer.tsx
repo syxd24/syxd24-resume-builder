@@ -20,6 +20,8 @@ export type ResumeRendererProps = Readonly<{
 
 type RendererVariables = CSSProperties & Record<`--${string}`, string | number>;
 
+type ContactIconName = "email" | "phone" | "location" | "website";
+
 function linkColor(design: ResumeDesign): string {
   switch (design.links.colorMode) {
     case "accent": return design.colors.accent;
@@ -68,24 +70,39 @@ function rendererVariables(design: ResumeDesign, pageFormat: PageFormat): Render
   };
 }
 
-function ContactItem({ icon, href, children }: { icon: string; href?: string; children: ReactNode }) {
+function ContactIcon({ name }: { name: ContactIconName }) {
+  const paths: Record<ContactIconName, ReactNode> = {
+    email: <path d="M2.25 4.5h15.5v11H2.25zM3 5.25l7 5 7-5" />,
+    phone: <path d="M5.2 2.75l2.35 3.7-1.7 1.7a14.2 14.2 0 0 0 6 6l1.7-1.7 3.7 2.35-.8 3.1c-.2.75-.9 1.25-1.65 1.2C7.3 18.55 1.45 12.7.9 5.2.85 4.45 1.35 3.75 2.1 3.55z" />,
+    location: <><path d="M10 18.2s5.2-5.25 5.2-10A5.2 5.2 0 0 0 4.8 8.2c0 4.75 5.2 10 5.2 10z" /><circle cx="10" cy="8.2" r="1.8" /></>,
+    website: <><circle cx="10" cy="10" r="7.75" /><path d="M2.5 10h15M10 2.25c2 2.15 3 4.75 3 7.75s-1 5.6-3 7.75C8 15.6 7 13 7 10s1-5.6 3-7.75z" /></>,
+  };
+
+  return (
+    <svg className={styles.contactIcon} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      {paths[name]}
+    </svg>
+  );
+}
+
+function ContactItem({ icon, href, children }: { icon?: ContactIconName; href?: string; children: ReactNode }) {
   const safeUrl = safeHref(href);
-  const content = <>{icon ? <span className={styles.contactIcon} aria-hidden="true">{icon}</span> : null}<span>{children}</span></>;
+  const content = <>{icon ? <ContactIcon name={icon} /> : null}<span>{children}</span></>;
   return safeUrl ? <a href={safeUrl} rel="noreferrer">{content}</a> : <span>{content}</span>;
 }
 
 function Header({ document, design, assetUrls }: Pick<ResumeRendererProps, "document" | "design" | "assetUrls">) {
   const personal = document.personal;
   const photoUrl = personal.photo?.storagePath ? assetUrls?.[personal.photo.storagePath] : undefined;
-  const icon = (value: string) => design.header.showIcons && design.links.showIcons ? value : "";
+  const icon = (value: ContactIconName) => design.header.showIcons && design.links.showIcons ? value : undefined;
   const contacts: ReactNode[] = [];
 
-  if (personal.email) contacts.push(<ContactItem key="email" icon={icon("@") } href={emailHref(personal.email)}>{personal.email}</ContactItem>);
-  if (personal.phone) contacts.push(<ContactItem key="phone" icon={icon("☎") } href={phoneHref(personal.phone)}>{personal.phone}</ContactItem>);
-  if (personal.location || personal.address) contacts.push(<ContactItem key="location" icon={icon("⌖")}>{personal.location || personal.address}</ContactItem>);
-  if (personal.website) contacts.push(<ContactItem key="website" icon={icon("↗") } href={personal.website}>{personal.website.replace(/^https?:\/\//, "")}</ContactItem>);
+  if (personal.email) contacts.push(<ContactItem key="email" icon={icon("email")} href={emailHref(personal.email)}>{personal.email}</ContactItem>);
+  if (personal.phone) contacts.push(<ContactItem key="phone" icon={icon("phone")} href={phoneHref(personal.phone)}>{personal.phone}</ContactItem>);
+  if (personal.location || personal.address) contacts.push(<ContactItem key="location" icon={icon("location")}>{personal.location || personal.address}</ContactItem>);
+  if (personal.website) contacts.push(<ContactItem key="website" icon={icon("website")} href={personal.website}>{personal.website.replace(/^https?:\/\//, "")}</ContactItem>);
   for (const link of personal.links.filter((item) => item.visible && item.url)) {
-    contacts.push(<ContactItem key={link.id} icon={icon("↗") } href={link.url}>{link.label || link.url}</ContactItem>);
+    contacts.push(<ContactItem key={link.id} icon={icon("website")} href={link.url}>{link.label || link.url}</ContactItem>);
   }
 
   const photo = design.photo.visible && photoUrl ? (

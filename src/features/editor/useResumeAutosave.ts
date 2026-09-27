@@ -18,8 +18,9 @@ export function useResumeAutosave(options: {
   initialVersion: number;
   snapshot: Snapshot;
   delayMs?: number;
+  disabled?: boolean;
 }) {
-  const { resumeId, initialVersion, snapshot, delayMs = 750 } = options;
+  const { resumeId, initialVersion, snapshot, delayMs = 750, disabled = false } = options;
   const [status, setStatus] = useState<SaveStatus>("saved");
   const [error, setError] = useState<string>();
   const latestRef = useRef(snapshot);
@@ -30,6 +31,7 @@ export function useResumeAutosave(options: {
   const inFlightRef = useRef<Promise<boolean> | undefined>(undefined);
 
   const flush = useCallback(async (): Promise<boolean> => {
+    if (disabled) return true;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = undefined;
     while (true) {
@@ -78,11 +80,18 @@ export function useResumeAutosave(options: {
       const succeeded = await request;
       if (!succeeded || !dirtyRef.current) return succeeded;
     }
-  }, [resumeId]);
+  }, [disabled, resumeId]);
 
   useEffect(() => {
     latestRef.current = snapshot;
     const nextHash = hash(snapshot);
+    if (disabled) {
+      savedHashRef.current = nextHash;
+      dirtyRef.current = false;
+      setStatus("saved");
+      setError(undefined);
+      return;
+    }
     if (nextHash === savedHashRef.current) return;
     dirtyRef.current = true;
     setStatus("saving");
@@ -91,9 +100,10 @@ export function useResumeAutosave(options: {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [snapshot, delayMs, flush]);
+  }, [snapshot, delayMs, disabled, flush]);
 
   useEffect(() => {
+    if (disabled) return;
     const warn = (event: BeforeUnloadEvent) => {
       if (!dirtyRef.current && !inFlightRef.current) return;
       event.preventDefault();
@@ -101,7 +111,7 @@ export function useResumeAutosave(options: {
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, []);
+  }, [disabled]);
 
   return { status, error, flush, retry: flush, versionRef };
 }

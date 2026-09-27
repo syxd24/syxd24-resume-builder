@@ -18,7 +18,15 @@ async function responseError(response: Response, fallback: string): Promise<Erro
   return new Error(payload.error || fallback);
 }
 
-export function ResumeEditor({ initialResume, initialPhotoUrl }: { initialResume: ResumeRecord; initialPhotoUrl?: string }) {
+export function ResumeEditor({
+  initialResume,
+  initialPhotoUrl,
+  previewMode = false,
+}: {
+  initialResume: ResumeRecord;
+  initialPhotoUrl?: string;
+  previewMode?: boolean;
+}) {
   const router = useRouter();
   const uploadRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(initialResume.title);
@@ -30,15 +38,28 @@ export function ResumeEditor({ initialResume, initialPhotoUrl }: { initialResume
   const [downloading, setDownloading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const snapshot = useMemo(() => ({ title, content: document, design }), [title, document, design]);
-  const autosave = useResumeAutosave({ resumeId: initialResume.id, initialVersion: initialResume.lockVersion, snapshot });
+  const autosave = useResumeAutosave({ resumeId: initialResume.id, initialVersion: initialResume.lockVersion, snapshot, disabled: previewMode });
   const assetUrls = document.personal.photo?.storagePath && photoUrl ? { [document.personal.photo.storagePath]: photoUrl } : undefined;
 
   const goBack = async () => {
+    if (previewMode) {
+      router.push("/resumes");
+      return;
+    }
     if (await autosave.flush()) router.push("/resumes");
   };
 
   const uploadPhoto = async (file: File) => {
     setActionError(undefined);
+    if (previewMode) {
+      const previewUrl = URL.createObjectURL(file);
+      setPhotoUrl((current) => {
+        if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+        return previewUrl;
+      });
+      setDocument((current) => ({ ...current, personal: { ...current.personal, photo: { storagePath: "preview/photo", alt: `${current.personal.fullName || "Resume"} profile` } } }));
+      return;
+    }
     const form = new FormData();
     form.append("file", file);
     const response = await fetch(`/api/resumes/${initialResume.id}/photo`, { method: "POST", body: form });
@@ -49,6 +70,10 @@ export function ResumeEditor({ initialResume, initialPhotoUrl }: { initialResume
   };
 
   const download = async () => {
+    if (previewMode) {
+      window.print();
+      return;
+    }
     setDownloading(true);
     setActionError(undefined);
     try {
@@ -108,19 +133,19 @@ export function ResumeEditor({ initialResume, initialPhotoUrl }: { initialResume
           <label htmlFor="resume-title">Resume title</label>
           <input id="resume-title" value={title} maxLength={300} onChange={(event) => setTitle(event.target.value)} />
           <div className={styles.saveState} data-state={autosave.status} role="status">
-            {autosave.status === "saving" ? "Saving…" : autosave.status === "error" ? "Save failed" : "Saved"}
+            {previewMode ? "Preview mode" : autosave.status === "saving" ? "Saving…" : autosave.status === "error" ? "Save failed" : "Saved"}
             {autosave.status === "error" ? <button type="button" onClick={() => void autosave.retry().catch(() => undefined)}>Retry</button> : null}
           </div>
         </div>
         <div className={styles.toolbarActions}>
-          <button type="button" className={styles.downloadButton} disabled={downloading} onClick={() => void download()}>{downloading ? "Generating…" : "Download PDF"}</button>
-          <div className={styles.menuWrap}>
+          <button type="button" className={styles.downloadButton} disabled={downloading} onClick={() => void download()}>{previewMode ? "Print preview" : downloading ? "Generating…" : "Download PDF"}</button>
+          {!previewMode ? <div className={styles.menuWrap}>
             <button type="button" className={styles.menuButton} aria-label="Resume actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>•••</button>
             {menuOpen ? <div className={styles.menu} role="menu">
               <button type="button" role="menuitem" onClick={() => runAction(duplicate)}>Duplicate</button>
               <button type="button" role="menuitem" className={styles.danger} onClick={() => runAction(remove)}>Delete</button>
             </div> : null}
-          </div>
+          </div> : null}
         </div>
       </header>
 

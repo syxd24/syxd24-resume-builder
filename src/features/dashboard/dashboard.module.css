@@ -2,13 +2,13 @@
   --dashboard-ink: #1d2533;
   --dashboard-muted: #697382;
   --dashboard-border: #dedbd5;
-  --dashboard-accent: #285a70;
-  --dashboard-accent-strong: #1c4558;
-  --dashboard-canvas: #f6f4ef;
+  --dashboard-accent: #35134d;
+  --dashboard-accent-strong: #240b35;
+  --dashboard-canvas: #f5f3ef;
   min-height: 100vh;
   color: var(--dashboard-ink);
   background:
-    radial-gradient(circle at 96% -10%, rgb(40 90 112 / 8%), transparent 31rem),
+    radial-gradient(circle at 96% -10%, rgb(240 0 115 / 6%), transparent 31rem),
     var(--dashboard-canvas);
 }
 
@@ -43,7 +43,7 @@
   color: #fff;
   border-radius: 10px;
   background: var(--dashboard-accent);
-  box-shadow: 0 6px 16px rgb(40 90 112 / 22%);
+  box-shadow: 0 6px 16px rgb(53 19 77 / 22%);
 }
 
 .brandMark svg,
@@ -72,12 +72,12 @@
 
 .sidebar nav a:hover {
   color: var(--dashboard-ink);
-  background: rgb(40 90 112 / 6%);
+  background: rgb(53 19 77 / 6%);
 }
 
 .sidebar nav .activeNav {
   color: var(--dashboard-accent-strong);
-  background: #e8f0f2;
+  background: #f1eaf5;
 }
 
 .privateNote {
@@ -148,7 +148,7 @@
 .primaryButton {
   color: #fff;
   background: var(--dashboard-accent);
-  box-shadow: 0 7px 16px rgb(40 90 112 / 17%);
+  box-shadow: 0 7px 18px rgb(53 19 77 / 18%);
 }
 
 .primaryButton:hover:not(:disabled) {
@@ -273,7 +273,7 @@
   place-items: center;
   color: var(--dashboard-accent);
   border-radius: 50%;
-  background: #e7eff2;
+  background: #f1eaf5;
 }
 
 .newIcon svg {
@@ -560,8 +560,8 @@
 }
 
 .createChoices > button:hover:not(:disabled) {
-  border-color: #94aeb9;
-  background: #f4f8f9;
+  border-color: #b69ac7;
+  background: #faf7fc;
 }
 
 .createChoices > button:disabled {
@@ -577,7 +577,7 @@
   margin-bottom: 15px;
   color: var(--dashboard-accent);
   border-radius: 10px;
-  background: #e9f0f2;
+  background: #f1eaf5;
 }
 
 .createChoices svg {

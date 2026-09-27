@@ -19,8 +19,14 @@ type PersonalDetailsCardProps = {
   onRequestPhotoUpload?: () => void;
 };
 
+function PersonalContactIcon({ kind }: { kind: "email" | "phone" | "location" }) {
+  if (kind === "email") return <svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="m5 8 7 5 7-5" /></svg>;
+  if (kind === "phone") return <svg viewBox="0 0 24 24"><path d="M8 4 5.5 5.2c-.9.5-.9 1.7-.6 2.7 1.5 5 5.2 8.7 10.2 10.2 1 .3 2.2.3 2.7-.6L19 15l-4-2-1.3 1.7a13 13 0 0 1-4.4-4.4L11 9 8 4Z" /></svg>;
+  return <svg viewBox="0 0 24 24"><path d="M12 21s6-5.4 6-11a6 6 0 1 0-12 0c0 5.6 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></svg>;
+}
+
 export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }: PersonalDetailsCardProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const personal = document.personal;
 
   const update = (patch: Partial<PersonalDetails>) => {
@@ -40,7 +46,33 @@ export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }
 
   return (
     <section className={styles.card} aria-labelledby="personal-details-heading">
-      <header className={styles.cardHeader}>
+      {!expanded ? (
+        <header className={styles.personalSummary}>
+          <div className={styles.personalSummaryText}>
+            <h2 id="personal-details-heading">{personal.fullName.trim() || "Your Name"}</h2>
+            <div className={styles.personalContacts}>
+              {personal.email ? <span><span aria-hidden="true"><PersonalContactIcon kind="email" /></span>{personal.email}</span> : null}
+              {personal.phone ? <span><span aria-hidden="true"><PersonalContactIcon kind="phone" /></span>{personal.phone}</span> : null}
+              {personal.location ? <span><span aria-hidden="true"><PersonalContactIcon kind="location" /></span>{personal.location}</span> : null}
+              {!summary ? <span>Name, contact details, links and photo</span> : null}
+            </div>
+          </div>
+          <div
+            className={styles.personalPhotoPreview}
+            aria-label={personal.photo ? "Profile photo attached" : "No profile photo"}
+          >
+            {personal.photo ? "Photo" : personal.fullName.trim().slice(0, 1).toUpperCase() || "+"}
+          </div>
+          <button
+            type="button"
+            className={styles.personalEditButton}
+            aria-label="Edit personal details"
+            onClick={() => setExpanded(true)}
+          >
+            ✎
+          </button>
+        </header>
+      ) : <header className={styles.cardHeader}>
         <div className={styles.sectionIdentity}>
           <span className={styles.sectionIcon} aria-hidden="true">PD</span>
           <div>
@@ -58,7 +90,7 @@ export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }
         >
           {expanded ? "⌃" : "⌄"}
         </button>
-      </header>
+      </header>}
 
       {expanded ? (
         <div id="personal-details-fields" className={styles.cardBody}>

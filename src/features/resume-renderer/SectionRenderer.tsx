@@ -131,11 +131,11 @@ function SkillsSection({ section, design }: SectionRendererProps & { section: Ex
   const display = design.sections[section.id]?.skillDisplay ?? "text";
   return (
     <SectionShell section={section} design={design}>
-      <div className={styles.competencies} data-skill-display={display}>
+      <div className={styles.competencies} data-competency-kind="skills" data-skill-display={display}>
         {section.entries.filter((entry) => entry.visible).map((entry) => {
           const detail = [entry.category, entry.description].filter(Boolean).join(design.entries.metadataSeparator);
           return (
-            <div className={styles.competency} key={entry.id}>
+            <div className={styles.competency} data-has-detail={detail ? "true" : "false"} key={entry.id}>
               <div className={styles.competencyText}>
                 <strong>{entry.name}</strong>
                 {detail ? <span>{detail}</span> : null}
@@ -158,10 +158,16 @@ function SkillsSection({ section, design }: SectionRendererProps & { section: Ex
 
 function LanguagesSection({ section, design }: SectionRendererProps & { section: Extract<ResumeSection, { type: "languages" }> }) {
   const display = design.sections[section.id]?.skillDisplay ?? "text";
+  const entries = section.entries.filter((entry) => entry.visible);
   return (
     <SectionShell section={section} design={design}>
-      <div className={styles.competencies} data-skill-display={display}>
-        {section.entries.filter((entry) => entry.visible).map((entry) => {
+      <div
+        className={styles.competencies}
+        data-competency-kind="languages"
+        data-item-count={Math.min(entries.length, 4)}
+        data-skill-display={display}
+      >
+        {entries.map((entry) => {
           const detail = [entry.proficiency, entry.detail].filter(Boolean).join(design.entries.metadataSeparator);
           return (
             <div className={styles.competency} key={entry.id}>
@@ -208,16 +214,16 @@ function ProjectsSection({ section, design }: SectionRendererProps & { section: 
 function CertificatesSection({ section, design }: SectionRendererProps & { section: Extract<ResumeSection, { type: "certificates" }> }) {
   return (
     <SectionShell section={section} design={design}>
-      <div className={styles.compactEntries}>
+      <div className={styles.certificateRows}>
         {section.entries.filter((entry) => entry.visible).map((entry) => (
-          <Entry key={entry.id}>
-            <EntryHeader
-              primary={<ExternalLink href={entry.url}>{entry.title}</ExternalLink>}
-              secondary={entry.issuer}
-              metadata={formatResumeDate(entry.date, design)}
-              design={design}
-            />
-          </Entry>
+          <article className={`${styles.entry} ${styles.certificateRow}`} key={entry.id}>
+            <span className={styles.certificateMarker} aria-hidden="true">—</span>
+            <div className={styles.certificateDetails}>
+              <ExternalLink href={entry.url}><strong>{entry.title}</strong></ExternalLink>
+              {entry.issuer ? <><span aria-hidden="true"> — </span><span>{entry.issuer}</span></> : null}
+            </div>
+            {entry.date ? <time className={styles.certificateDate}>{formatResumeDate(entry.date, design)}</time> : null}
+          </article>
         ))}
       </div>
     </SectionShell>

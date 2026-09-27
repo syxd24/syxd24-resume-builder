@@ -25,6 +25,7 @@ describe("ContentEditor", () => {
     const changed = vi.fn();
     render(<ControlledEditor onDocument={changed} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Edit personal details" }));
     fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Ada Lovelace" } });
 
     const next = changed.mock.lastCall?.[0];

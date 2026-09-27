@@ -1,6 +1,6 @@
 import type { ResumeDesign, ResumeDocument, ResumeSection, RichText } from "@/domain/resume";
 
-import { PAGE_DIMENSIONS, type PageFormat } from "./format";
+import { formatDateRange, formatResumeDate, PAGE_DIMENSIONS, type PageFormat } from "./format";
 
 export type ResumePageModel = Readonly<{
   number: number;
@@ -61,7 +61,8 @@ function entryHeight(section: Exclude<ResumeSection, { type: "summary" | "declar
   if (section.type === "languages") {
     const entry = section.entries[index]!;
     const detail = [entry.proficiency, entry.detail].filter(Boolean).join(design.entries.metadataSeparator);
-    const lines = Math.max(1, Math.ceil(`${entry.name} ${detail}`.length / chars));
+    const columnChars = Math.max(14, Math.floor(chars / 4));
+    const lines = Math.max(1, Math.ceil(entry.name.length / columnChars)) + (detail ? Math.max(1, Math.ceil(detail.length / columnChars)) : 0);
     return lines * line + (design.sections[section.id]?.skillDisplay === "level" ? line : 0);
   }
   if (section.type === "interests") {
@@ -74,25 +75,113 @@ function entryHeight(section: Exclude<ResumeSection, { type: "summary" | "declar
     return line * (2 + contactLines);
   }
 
+  if (section.type === "certificates") {
+    const entry = section.entries[index]!;
+    const text = [entry.title, entry.issuer, formatResumeDate(entry.date, design)].filter(Boolean).join(" ");
+    return line * Math.max(1, Math.ceil(text.length / chars));
+  }
+
+  let headerText = "";
+  switch (section.type) {
+    case "experience": {
+      const entry = section.entries[index]!;
+      headerText = [entry.position, entry.employer, entry.location, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+    case "education": {
+      const entry = section.entries[index]!;
+      headerText = [entry.degree, entry.institution, entry.location, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+    case "projects": {
+      const entry = section.entries[index]!;
+      headerText = [entry.title, entry.subtitle, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+    case "courses": {
+      const entry = section.entries[index]!;
+      headerText = [entry.title, entry.provider, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+    case "awards": {
+      const entry = section.entries[index]!;
+      headerText = [entry.title, entry.issuer, formatResumeDate(entry.date, design)].filter(Boolean).join(" ");
+      break;
+    }
+    case "organisations": {
+      const entry = section.entries[index]!;
+      headerText = [entry.name, entry.role, entry.location, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+    case "publications": {
+      const entry = section.entries[index]!;
+      headerText = [entry.title, entry.publisher, formatResumeDate(entry.date, design)].filter(Boolean).join(" ");
+      break;
+    }
+    case "custom": {
+      const entry = section.entries[index]!;
+      headerText = [entry.title, entry.subtitle, entry.location, formatDateRange(entry.dateRange, design)].join(" ");
+      break;
+    }
+  }
   const entry = section.entries[index]!;
-  let height = line * 2;
+  let height = line * Math.max(1, Math.ceil(headerText.length / chars));
   if ("description" in entry && Array.isArray(entry.description) && entry.description.length) {
-    height += 1 + richTextHeight(entry.description, chars, design);
+    height += 0.65 + richTextHeight(entry.description, chars, design);
   }
   return height;
 }
 
+function entrySpacing(section: Exclude<ResumeSection, { type: "summary" | "declaration" }>, design: ResumeDesign): number {
+  if (section.type === "certificates") return 0.75;
+  if (section.type === "skills" || section.type === "languages" || section.type === "interests") return 1.1;
+  return design.spacing.entryGapMm;
+}
+
+function entriesHeight(
+  section: Exclude<ResumeSection, { type: "summary" | "declaration" }>,
+  itemHeights: number[],
+  design: ResumeDesign,
+): number {
+  const line = lineHeightMm(design);
+  if (section.type === "skills" && (design.sections[section.id]?.skillDisplay ?? "text") === "text") {
+    const entries = section.entries;
+    const allPlain = entries.every((entry) => !entry.category && !entry.description);
+    if (allPlain) {
+      const length = entries.reduce((total, entry) => total + entry.name.length + 3, 0);
+      return Math.max(1, Math.ceil(length / charsPerLine(section, design))) * line;
+    }
+  }
+
+  if (section.type === "languages" && itemHeights.length) {
+    const fullWidth = design.layout.mode === "one-column" || section.column === "full";
+    const columns = Math.min(itemHeights.length, fullWidth ? 4 : 2);
+    let height = 0;
+    for (let index = 0; index < itemHeights.length; index += columns) {
+      height += Math.max(...itemHeights.slice(index, index + columns));
+      if (index + columns < itemHeights.length) height += 1.5;
+    }
+    return height;
+  }
+
+  return itemHeights.reduce((total, height) => total + height, 0) + entrySpacing(section, design) * Math.max(0, itemHeights.length - 1);
+}
+
 function headingHeight(design: ResumeDesign): number {
-  return (design.typography.baseSizePt + design.typography.sectionHeadingOffsetPt) * 0.3528 * 1.2 + design.spacing.headingGapMm;
+  return (design.typography.baseSizePt + design.typography.sectionHeadingOffsetPt) * 0.3528 * 1.05 + 0.6 + design.spacing.headingGapMm;
 }
 
 function headerHeight(document: ResumeDocument, design: ResumeDesign): number {
   const contacts = [document.personal.email, document.personal.phone, document.personal.location, document.personal.address, document.personal.website]
     .filter(Boolean).length + document.personal.links.filter((link) => link.visible && link.url).length;
-  const contactLines = design.header.detailsArrangement === "stacked" ? Math.min(contacts, 5) : Math.max(contacts ? 1 : 0, Math.ceil(contacts / 3));
-  const nameHeight = (design.typography.baseSizePt + design.typography.nameOffsetPt) * 0.3528 * 1.05;
+  const contactLines = design.header.detailsArrangement === "stacked"
+    ? Math.min(contacts, 7)
+    : design.header.detailsArrangement === "split"
+      ? Math.ceil(contacts / 2)
+      : Math.max(contacts ? 1 : 0, Math.ceil(contacts / 6));
+  const nameHeight = (design.typography.baseSizePt + design.typography.nameOffsetPt) * 0.3528;
   const photoHeight = design.photo.visible && document.personal.photo ? design.photo.sizeMm : 0;
-  return Math.max(nameHeight + (document.personal.jobTitle ? 6 : 0) + contactLines * 4.5, photoHeight) + design.spacing.headerGapMm + 3;
+  return Math.max(nameHeight + (document.personal.jobTitle ? 4.5 : 0) + contactLines * 3.8, photoHeight) + design.spacing.headerGapMm + 2;
 }
 
 function pageCapacity(document: ResumeDocument, design: ResumeDesign, format: PageFormat, first: boolean): number {
@@ -164,7 +253,7 @@ export function paginateResume(document: ResumeDocument, design: ResumeDesign, f
     const visibleSection = withEntries(section, visibleEntries);
     const typedVisibleSection = visibleSection as Exclude<ResumeSection, { type: "summary" | "declaration" }>;
     const itemHeights = visibleEntries.map((_, index) => entryHeight(typedVisibleSection, index, design));
-    const totalHeight = heading + itemHeights.reduce((total, height) => total + height, 0) + design.spacing.entryGapMm * Math.max(0, visibleEntries.length - 1);
+    const totalHeight = heading + entriesHeight(typedVisibleSection, itemHeights, design);
     const currentSpacing = pages[pageIndex]!.length ? design.spacing.sectionGapMm : 0;
     if (used + currentSpacing + totalHeight <= capacity()) {
       addFragment(visibleSection, totalHeight);
@@ -180,7 +269,7 @@ export function paginateResume(document: ResumeDocument, design: ResumeDesign, f
     let fragmentHeight = heading;
     for (let index = 0; index < visibleEntries.length; index += 1) {
       const height = itemHeights[index]!;
-      const entryGap = entries.length ? design.spacing.entryGapMm : 0;
+      const entryGap = entries.length ? entrySpacing(typedVisibleSection, design) : 0;
       const spacing = pages[pageIndex]!.length ? design.spacing.sectionGapMm : 0;
       if (entries.length && used + spacing + fragmentHeight + entryGap + height > capacity()) {
         addFragment(withEntries(section, entries), fragmentHeight);
@@ -188,7 +277,7 @@ export function paginateResume(document: ResumeDocument, design: ResumeDesign, f
         fragmentHeight = heading;
       }
       ensureFragmentFits(fragmentHeight + height);
-      const nextGap = entries.length ? design.spacing.entryGapMm : 0;
+      const nextGap = entries.length ? entrySpacing(typedVisibleSection, design) : 0;
       entries = [...entries, visibleEntries[index]!] as typeof visibleEntries;
       fragmentHeight += nextGap + height;
     }

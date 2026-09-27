@@ -207,12 +207,12 @@ export function DashboardLibrary() {
 
       <Modal open={createOpen} onClose={() => !creating && setCreateOpen(false)} title="Create a resume" description="Choose how you would like to begin. You can edit every detail afterward.">
         <div className={styles.createChoices}>
-          <button type="button" onClick={() => void handleCreate()} disabled={creating}>
+          <button type="button" aria-label="Start blank" onClick={() => void handleCreate()} disabled={creating}>
             <span><BlankPageIcon /></span>
             <strong>{creating ? "Creating…" : "Start blank"}</strong>
             <small>Begin with the essential resume sections.</small>
           </button>
-          <button type="button" onClick={() => router.push("/resumes/import")} disabled={creating}>
+          <button type="button" aria-label="Import existing resume" onClick={() => router.push("/resumes/import")} disabled={creating}>
             <span><UploadIcon /></span>
             <strong>Import existing resume</strong>
             <small>Upload a PDF, DOCX, or TXT file.</small>

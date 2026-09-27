@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -12,6 +12,33 @@ const resumeDocument = resumeDocumentSchema.parse(JSON.parse(readFileSync(path.j
 const design = resumeDesignSchema.parse(JSON.parse(readFileSync(path.join(fixtureRoot, "default-design.json"), "utf8")));
 const resumeId = "00000000-0000-4000-8000-000000000001";
 const outputDir = path.resolve("test-results/visual-pdf");
+const require = createRequire(import.meta.url);
+const pdfjs = require("pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js") as {
+  getDocument(data: Uint8Array): Promise<{
+    numPages: number;
+    getPage(pageNumber: number): Promise<{
+      view: [number, number, number, number];
+      getAnnotations(): Promise<Array<{ url?: string }>>;
+      getTextContent(): Promise<{ items: Array<{ str?: string }> }>;
+    }>;
+  }>;
+};
+
+async function inspectPdf(pdfPath: string) {
+  const bytes = readFileSync(pdfPath);
+  const pdf = await pdfjs.getDocument(new Uint8Array(bytes));
+  const firstPage = await pdf.getPage(1);
+  const text = (await firstPage.getTextContent()).items.map((item) => item.str ?? "").join(" ");
+  const links = (await firstPage.getAnnotations()).flatMap((annotation) => annotation.url ? [annotation.url] : []);
+  return {
+    pages: pdf.numPages,
+    width: firstPage.view[2] - firstPage.view[0],
+    height: firstPage.view[3] - firstPage.view[1],
+    text,
+    links,
+    tagged: bytes.toString("latin1").includes("/StructTreeRoot") && bytes.toString("latin1").includes("/MarkInfo"),
+  };
+}
 
 function record(title: string, updatedAt: string, pageFormat: "A4" | "Letter" = "A4"): ResumeRecord {
   const recordDesign = { ...design, document: { ...design.document, pageFormat } };
@@ -63,7 +90,7 @@ async function openFixtureEditor(page: Page) {
     });
   });
   await page.goto("/__qa/visual-pdf?view=editor");
-  await expect(page.getByRole("heading", { name: "Build your resume" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit personal details" })).toBeVisible();
   await makeStable(page);
 }
 
@@ -106,7 +133,7 @@ test("library remains usable at a mobile viewport", async ({ page }) => {
 
 test("content editor visual with expanded experience", async ({ page }) => {
   await openFixtureEditor(page);
-  await page.getByRole("button", { name: /^PROFESSIONAL EXPERIENCE 2 entries$/i }).click();
+  await page.getByRole("button", { name: /^PROFESSIONAL EXPERIENCE$/i }).click();
   await expect(page.getByRole("region", { name: "content controls" }).getByText("Junior Software Developer", { exact: true })).toBeVisible();
 
   await expect(page).toHaveScreenshot("content-expanded-experience-1440x900.png", { animations: "disabled" });
@@ -194,8 +221,8 @@ test("stress fixture renders 3+ pages without DOM overflow or duplicate entries"
 test("generated PDFs have selectable source text, links in the source tree, and exact page geometry", async ({ page }) => {
   mkdirSync(outputDir, { recursive: true });
   const variants = [
-    { format: "A4", expected: /594(?:\.\d+)? x 841(?:\.\d+)? pts \(A4\)/ },
-    { format: "Letter", expected: /612 x 792 pts/ },
+    { format: "A4", width: 595, height: 842 },
+    { format: "Letter", width: 612, height: 792 },
   ] as const;
 
   for (const variant of variants) {
@@ -207,10 +234,14 @@ test("generated PDFs have selectable source text, links in the source tree, and 
     const pdfPath = path.join(outputDir, `golden-${variant.format.toLowerCase()}.pdf`);
     await page.emulateMedia({ media: "print" });
     await page.pdf({ path: pdfPath, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false, tagged: true });
-    const info = execFileSync("pdfinfo", [pdfPath], { encoding: "utf8" });
-    expect(info).toMatch(new RegExp(`Pages:\\s+${previewPages}`));
-    expect(info).toMatch(variant.expected);
-    expect(info).toMatch(/Tagged:\s+yes/i);
+    const info = await inspectPdf(pdfPath);
+    expect(info.pages).toBe(previewPages);
+    expect(info.width).toBeCloseTo(variant.width, 0);
+    expect(info.height).toBeCloseTo(variant.height, 0);
+    expect(info.tagged).toBe(true);
+    expect(info.text).toContain("Alex Morgan");
+    expect(info.text).toContain("PROFESSIONAL EXPERIENCE");
+    expect(info.links).toContain("https://github.com/example");
   }
 
   await page.goto("/__qa/visual-pdf?view=stress-print");
@@ -220,6 +251,6 @@ test("generated PDFs have selectable source text, links in the source tree, and 
   const stressPath = path.join(outputDir, "stress-a4.pdf");
   await page.emulateMedia({ media: "print" });
   await page.pdf({ path: stressPath, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false, tagged: true });
-  const stressInfo = execFileSync("pdfinfo", [stressPath], { encoding: "utf8" });
-  expect(stressInfo).toMatch(new RegExp(`Pages:\\s+${previewPages}`));
+  const stressInfo = await inspectPdf(stressPath);
+  expect(stressInfo.pages).toBe(previewPages);
 });

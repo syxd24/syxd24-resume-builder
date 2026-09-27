@@ -76,7 +76,7 @@ export function phoneHref(phone: string): string {
 }
 
 const FONT_STACKS: Record<string, string> = {
-  Alegreya: '"Alegreya", "Palatino Linotype", Palatino, Georgia, serif',
+  Alegreya: '"Alegreya", Inter, "Source Sans 3", "Segoe UI", Arial, ui-sans-serif, system-ui, sans-serif',
   Georgia: 'Georgia, "Times New Roman", serif',
   Inter: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
   Lato: 'Lato, ui-sans-serif, system-ui, sans-serif',
