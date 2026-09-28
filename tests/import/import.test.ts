@@ -8,7 +8,7 @@ vi.mock("pdf-parse/lib/pdf-parse.js", () => ({
 import { importMimeTypes } from "@/data/imports/types";
 import { classifyResumeText } from "@/features/import/classifier";
 import { ResumeImportError } from "@/features/import/errors";
-import { extractResume } from "@/features/import/extractor";
+import { docxHtmlToText, extractResume } from "@/features/import/extractor";
 import { sanitizeImportFilename, validateImportSource } from "@/features/import/validation";
 
 async function minimalDocx(text: string): Promise<Uint8Array> {
@@ -51,5 +51,106 @@ describe("resume import", () => {
   it("reports image-only PDFs explicitly instead of inventing content", async () => {
     const bytes = new TextEncoder().encode("%PDF-1.7\nmock scanned payload");
     await expect(extractResume("pdf", bytes)).rejects.toMatchObject({ code: "NO_TEXT" });
+  });
+
+  it("maps dense PDF text into structured header, jobs, grouped skills, languages, education, and certificates", () => {
+    const result = classifyResumeText(`Taylor Example
+taylor@example.com
++48 555 010 020
+Krakow, Poland
+
+SUMMARY
+Customer support professional with international experience and
+strong analytical skills.
+PROFESSIONAL EXPERIENCE
+Customer Service Representative, Example Co08/2025 – Present | Krakow, Poland
+•Resolve complex customer cases across multiple channels and
+document accurate solutions.
+•Train colleagues on new processes.
+SKILLS
+Case Handling & Customer Support: Complex Case Resolution, Complaint Handling,
+Escalation Management
+Tools & Digital Skills: Excel, PowerPoint, Teams
+EDUCATION
+Bachelor of Education, Example UniversityPresent | Krakow, Poland
+LANGUAGES
+English
+Fluent
+Polish
+Native/Bilingual
+CERTIFICATES
+— Service Award — Example Co
+Q1 2026
+— Data Analytics — Coursera`);
+
+    expect(result.document.personal).toMatchObject({
+      fullName: "Taylor Example",
+      email: "taylor@example.com",
+      phone: "+48 555 010 020",
+      location: "Krakow, Poland",
+    });
+    expect(result.document.personal.jobTitle).toBeUndefined();
+
+    const summary = result.document.sections.find((section) => section.type === "summary");
+    expect(summary).toMatchObject({ type: "summary", content: [{ type: "paragraph", text: "Customer support professional with international experience and strong analytical skills." }] });
+
+    const experience = result.document.sections.find((section) => section.type === "experience");
+    expect(experience).toMatchObject({
+      type: "experience",
+      entries: [{
+        position: "Customer Service Representative",
+        employer: "Example Co",
+        location: "Krakow, Poland",
+        dateRange: { start: { month: 8, year: 2025, raw: "08/2025" }, current: true },
+        description: [
+          { type: "bullet", text: "Resolve complex customer cases across multiple channels and document accurate solutions." },
+          { type: "bullet", text: "Train colleagues on new processes." },
+        ],
+      }],
+    });
+
+    const skills = result.document.sections.find((section) => section.type === "skills");
+    expect(skills).toMatchObject({
+      type: "skills",
+      entries: [
+        { name: "Case Handling & Customer Support", description: "Complex Case Resolution, Complaint Handling, Escalation Management" },
+        { name: "Tools & Digital Skills", description: "Excel, PowerPoint, Teams" },
+      ],
+    });
+
+    const education = result.document.sections.find((section) => section.type === "education");
+    expect(education).toMatchObject({
+      type: "education",
+      entries: [{ degree: "Bachelor of Education", institution: "Example University", location: "Krakow, Poland", dateRange: { current: true } }],
+    });
+
+    const languages = result.document.sections.find((section) => section.type === "languages");
+    expect(languages).toMatchObject({
+      type: "languages",
+      entries: [
+        { name: "English", proficiency: "Fluent" },
+        { name: "Polish", proficiency: "Native/Bilingual" },
+      ],
+    });
+
+    const certificates = result.document.sections.find((section) => section.type === "certificates");
+    expect(certificates).toMatchObject({
+      type: "certificates",
+      entries: [
+        { title: "Service Award", issuer: "Example Co", date: { raw: "Q1 2026" } },
+        { title: "Data Analytics", issuer: "Coursera" },
+      ],
+    });
+    expect(result.unclassifiedText).toEqual([]);
+  });
+
+  it("retains DOCX list items as bullet blocks", () => {
+    const text = docxHtmlToText("<p>EXPERIENCE</p><p>Engineer, Example Co 2024 - Present</p><ul><li>Built APIs.</li><li>Supported users.</li></ul>");
+    const result = classifyResumeText(`Alex Morgan\n${text}`);
+    const experience = result.document.sections.find((section) => section.type === "experience");
+    expect(experience).toMatchObject({
+      type: "experience",
+      entries: [{ description: [{ type: "bullet", text: "Built APIs." }, { type: "bullet", text: "Supported users." }] }],
+    });
   });
 });

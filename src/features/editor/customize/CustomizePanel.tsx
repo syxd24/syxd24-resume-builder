@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
 import Image from "next/image";
 
 import type { ResumeDesign, SectionType } from "@/domain/resume";
@@ -58,6 +59,11 @@ const fonts = [
   "Arial",
   "Georgia",
   "Inter",
+  "Lato",
+  "Libre Baskerville",
+  "Merriweather",
+  "Open Sans",
+  "Roboto",
   "Source Sans 3",
   "Times New Roman",
 ] as const;
@@ -68,6 +74,8 @@ type SectionChoice = Readonly<{
   id: string;
   label: string;
   type: SectionType;
+  column?: "primary" | "secondary" | "full";
+  visible?: boolean;
 }>;
 
 export type PhotoAssetState = Readonly<{
@@ -83,6 +91,9 @@ export type CustomizePanelProps = Readonly<{
   photoAsset?: PhotoAssetState;
   onPhotoUpload?: (file: File) => void | Promise<void>;
   onPhotoRemove?: () => void | Promise<void>;
+  onSectionMove?: (from: number, to: number) => void;
+  onSectionColumnChange?: (sectionId: string, column: "primary" | "secondary" | "full") => void;
+  onSectionVisibilityChange?: (sectionId: string, visible: boolean) => void;
   initialCategory?: CustomizeCategory;
 }>;
 
@@ -157,8 +168,57 @@ function TemplateSettings() {
   );
 }
 
-function LayoutSettings({ design, onChange }: Pick<CustomizePanelProps, "design" | "onChange">) {
+function sectionAbbreviation(type: SectionType): string {
+  const abbreviations: Partial<Record<SectionType, string>> = {
+    summary: "SU",
+    experience: "EX",
+    education: "ED",
+    skills: "SK",
+    languages: "LA",
+    certificates: "CE",
+  };
+  return abbreviations[type] ?? type.slice(0, 2).toUpperCase();
+}
+
+function LayoutSettings({
+  design,
+  onChange,
+  sections = [],
+  onSectionMove,
+  onSectionColumnChange,
+}: Pick<CustomizePanelProps, "design" | "onChange" | "sections" | "onSectionMove" | "onSectionColumnChange">) {
   const usesColumns = design.layout.mode !== "one-column";
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  const moveWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (!onSectionMove) return;
+    const target = event.key === "ArrowUp" ? index - 1 : event.key === "ArrowDown" ? index + 1 : undefined;
+    if (target === undefined || target < 0 || target >= sections.length) return;
+    event.preventDefault();
+    onSectionMove(index, target);
+  };
+
+  const beginDrag = (event: DragEvent<HTMLDivElement>, index: number) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", sections[index]?.id ?? "");
+    setDragIndex(index);
+    setDropIndex(index);
+  };
+
+  const enterRow = (event: DragEvent<HTMLDivElement>, index: number) => {
+    event.preventDefault();
+    if (dragIndex === null || dragIndex === index || !onSectionMove) return;
+    onSectionMove(dragIndex, index);
+    setDragIndex(index);
+    setDropIndex(index);
+  };
+
+  const finishDrag = () => {
+    setDragIndex(null);
+    setDropIndex(null);
+  };
+
   return (
     <SettingsCard title="Layout" description="Choose the page structure and balance the content columns.">
       <SegmentedControl
@@ -193,6 +253,62 @@ function LayoutSettings({ design, onChange }: Pick<CustomizePanelProps, "design"
           />
         </>
       ) : null}
+      <div className={styles.layoutSection}>
+        <div className={styles.layoutSectionHeading}>
+          <h3>Change section layout</h3>
+          <p>Drag sections into the order you want. The preview updates immediately.</p>
+        </div>
+        <div className={styles.sectionLayoutList} aria-label="Change section layout">
+          <div className={`${styles.sectionLayoutRow} ${styles.sectionLayoutFixed}`}>
+            <span className={styles.layoutHandlePlaceholder} aria-hidden="true">::</span>
+            <span className={styles.layoutSectionIcon} aria-hidden="true">PD</span>
+            <span className={styles.layoutSectionLabel}>Personal Details</span>
+            <span className={styles.fixedLabel}>Fixed header</span>
+          </div>
+          {sections.map((section, index) => (
+            <div
+              key={section.id}
+              className={`${styles.sectionLayoutRow} ${dragIndex === index ? styles.sectionLayoutDragging : ""} ${dropIndex === index ? styles.sectionLayoutTarget : ""}`}
+              draggable={Boolean(onSectionMove)}
+              onDragStart={(event) => beginDrag(event, index)}
+              onDragEnter={(event) => enterRow(event, index)}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDropIndex(index);
+              }}
+              onDragEnd={finishDrag}
+              onDrop={(event) => {
+                event.preventDefault();
+                finishDrag();
+              }}
+            >
+              <button
+                type="button"
+                className={styles.layoutDragHandle}
+                aria-label={`Reorder ${section.label}. Use drag and drop or the Up and Down arrow keys.`}
+                onKeyDown={(event) => moveWithKeyboard(event, index)}
+              >
+                <span aria-hidden="true">⠿</span>
+              </button>
+              <span className={styles.layoutSectionIcon} aria-hidden="true">{sectionAbbreviation(section.type)}</span>
+              <span className={styles.layoutSectionLabel}>{section.label}</span>
+              {usesColumns ? (
+                <select
+                  className={styles.layoutColumnSelect}
+                  aria-label={`${section.label} column placement`}
+                  value={section.column ?? "full"}
+                  onChange={(event) => onSectionColumnChange?.(section.id, event.target.value as "primary" | "secondary" | "full")}
+                >
+                  <option value="full">Full width</option>
+                  <option value="primary">Primary</option>
+                  <option value="secondary">Secondary</option>
+                </select>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
     </SettingsCard>
   );
 }
@@ -401,7 +517,12 @@ function FooterSettings({ design, onChange }: Pick<CustomizePanelProps, "design"
   );
 }
 
-function SectionSettings({ design, onChange, sections = [] }: Pick<CustomizePanelProps, "design" | "onChange" | "sections">) {
+function SectionSettings({
+  design,
+  onChange,
+  sections = [],
+  onSectionVisibilityChange,
+}: Pick<CustomizePanelProps, "design" | "onChange" | "sections" | "onSectionVisibilityChange">) {
   const updateSection = (sectionId: string, patch: Partial<ResumeDesign["sections"][string]>) => {
     const current = design.sections[sectionId] ?? { headingStyle: "inherit" as const, skillDisplay: "text" as const };
     onChange(replaceGroup(design, "sections", { [sectionId]: { ...current, ...patch } }));
@@ -414,6 +535,11 @@ function SectionSettings({ design, onChange, sections = [] }: Pick<CustomizePane
         return (
           <div className={styles.sectionCustomization} key={section.id}>
             <h3>{section.label}</h3>
+            <SwitchControl
+              label={`Show ${section.label}`}
+              checked={section.visible ?? true}
+              onChange={(visible) => onSectionVisibilityChange?.(section.id, visible)}
+            />
             <SelectControl label={`${section.label} heading style`} value={override.headingStyle} options={[
               { value: "inherit", label: "Use global style" }, { value: "simple", label: "Simple" }, { value: "rule", label: "Rule" }, { value: "underline", label: "Underline" }, { value: "boxed", label: "Boxed" },
             ]} onChange={(headingStyle) => updateSection(section.id, { headingStyle })} />
@@ -423,7 +549,7 @@ function SectionSettings({ design, onChange, sections = [] }: Pick<CustomizePane
           </div>
         );
       }) : <p className={styles.lockedCopy}>Add sections in Content to configure their presentation here.</p>}
-      <p className={styles.fieldHint}>Rename, visibility, order, and column placement are content structure settings and remain editable in Content.</p>
+      <p className={styles.fieldHint}>Rename and edit section content in Content. Reorder sections and assign columns in Layout.</p>
     </SettingsCard>
   );
 }
@@ -450,6 +576,45 @@ function CategoryContent(props: CustomizePanelProps & { category: CustomizeCateg
 export function CustomizePanel(props: CustomizePanelProps) {
   const [category, setCategory] = useState<CustomizeCategory>(props.initialCategory ?? "document");
   const settingsTitleId = useId();
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const categoryRefs = useRef<Partial<Record<CustomizeCategory, HTMLDivElement | null>>>({});
+
+  const updateActiveCategory = useCallback(() => {
+    const container = settingsRef.current;
+    if (!container) return;
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 12) {
+      setCategory(categories.at(-1) ?? "sections");
+      return;
+    }
+
+    const marker = container.getBoundingClientRect().top + Math.min(128, container.clientHeight * 0.28);
+    let next: CustomizeCategory = categories[0];
+    for (const item of categories) {
+      const section = categoryRefs.current[item];
+      if (section && section.getBoundingClientRect().top <= marker) next = item;
+    }
+    setCategory((current) => current === next ? current : next);
+  }, []);
+
+  useEffect(() => {
+    if (!props.initialCategory || props.initialCategory === "document") return;
+    const container = settingsRef.current;
+    const target = categoryRefs.current[props.initialCategory];
+    if (!container || !target) return;
+    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 16;
+    if (typeof container.scrollTo === "function") container.scrollTo({ top });
+    else container.scrollTop = top;
+  }, [props.initialCategory]);
+
+  const scrollToCategory = (item: CustomizeCategory) => {
+    const container = settingsRef.current;
+    const target = categoryRefs.current[item];
+    setCategory(item);
+    if (!container || !target) return;
+    const top = target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 16;
+    if (typeof container.scrollTo === "function") container.scrollTo({ top, behavior: "smooth" });
+    else container.scrollTop = top;
+  };
 
   return (
     <div className={styles.panel}>
@@ -457,16 +622,28 @@ export function CustomizePanel(props: CustomizePanelProps) {
         <ul className={styles.railList}>
           {categories.map((item) => (
             <li key={item}>
-              <button type="button" className={item === category ? styles.railButtonActive : styles.railButton} aria-current={item === category ? "page" : undefined} onClick={() => setCategory(item)}>
+              <button type="button" className={item === category ? styles.railButtonActive : styles.railButton} aria-current={item === category ? "location" : undefined} onClick={() => scrollToCategory(item)}>
                 {categoryLabels[item]}
               </button>
             </li>
           ))}
         </ul>
       </nav>
-      <div className={styles.settings} aria-labelledby={settingsTitleId}>
-        <h1 className={styles.settingsTitle} id={settingsTitleId}>{categoryLabels[category]}</h1>
-        <CategoryContent {...props} category={category} />
+      <div ref={settingsRef} className={styles.settings} data-customize-settings="true" aria-labelledby={settingsTitleId} onScroll={updateActiveCategory}>
+        <h1 className={styles.visuallyHidden} id={settingsTitleId}>Customize resume settings</h1>
+        <div className={styles.settingsFlow}>
+          {categories.map((item) => (
+            <div
+              id={`customize-${item}`}
+              key={item}
+              ref={(node) => { categoryRefs.current[item] = node; }}
+              className={styles.settingsSection}
+              data-category={item}
+            >
+              <CategoryContent {...props} category={item} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

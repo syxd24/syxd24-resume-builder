@@ -307,11 +307,15 @@
 
 .thumbnailViewport {
   position: relative;
+  display: grid;
   aspect-ratio: 210 / 297;
+  place-items: center;
   overflow: hidden;
+  box-sizing: border-box;
+  padding: 12px;
   border: 1px solid #dedede;
   border-radius: 14px;
-  background: #ebe9e4;
+  background: #eeece8;
   box-shadow: 0 11px 30px rgb(34 38 45 / 10%);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
@@ -327,17 +331,20 @@
 }
 
 .thumbnailScale {
-  position: absolute;
-  inset: 12px;
-  overflow: hidden;
+  position: relative;
+  flex: 0 0 auto;
+  overflow: visible;
   pointer-events: none;
   background: #fff;
-  box-shadow: 0 2px 8px rgb(22 27 33 / 10%);
+  box-shadow: 0 3px 10px rgb(22 27 33 / 12%);
 }
 
-.thumbnailScale > * {
-  width: 100%;
-  min-height: 100%;
+.thumbnailScale [data-render-mode="thumbnail"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: scale(var(--thumbnail-scale));
+  transform-origin: top left;
 }
 
 .cardFooter {

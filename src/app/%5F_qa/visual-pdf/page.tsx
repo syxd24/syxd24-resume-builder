@@ -63,7 +63,7 @@ function fixtureResume(): ResumeRecord {
 export default async function VisualPdfQaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; format?: string }>;
+  searchParams: Promise<{ view?: string; format?: string; font?: string }>;
 }) {
   if (process.env.NODE_ENV === "production") notFound();
 
@@ -81,9 +81,12 @@ export default async function VisualPdfQaPage({
         footer: { ...fixtureDesign.footer, pageNumbers: true, showName: true, gapMm: 4 },
       })
     : design;
-  const renderDesign = query.format === "Letter"
+  const formattedDesign = query.format === "Letter"
     ? { ...fixtureVariant, document: { ...fixtureVariant.document, pageFormat: "Letter" as const } }
     : fixtureVariant;
+  const renderDesign = query.font
+    ? { ...formattedDesign, typography: { ...formattedDesign.typography, bodyFont: query.font, nameFont: "inherit" as const } }
+    : formattedDesign;
 
   return (
     <main

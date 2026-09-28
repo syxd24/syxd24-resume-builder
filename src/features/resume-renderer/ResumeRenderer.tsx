@@ -14,6 +14,7 @@ export type ResumeRendererProps = Readonly<{
   design: ResumeDesign;
   pageFormat?: PageFormat;
   mode?: ResumeRenderMode;
+  pageLimit?: number;
   assetUrls?: ResumeAssetUrls;
   className?: string;
 }>;
@@ -159,9 +160,11 @@ function SectionLayout({ sections, design, assetUrls }: { sections: ResumeSectio
   );
 }
 
-export function ResumeRenderer({ document, design, pageFormat, mode = "editor", assetUrls, className }: ResumeRendererProps) {
+export function ResumeRenderer({ document, design, pageFormat, mode = "editor", pageLimit, assetUrls, className }: ResumeRendererProps) {
   const format = pageFormat ?? design.document.pageFormat;
   const sections = document.sections.filter((section) => section.visible);
+  const pages = paginateResume({ ...document, sections }, design, format);
+  const visiblePages = pageLimit === undefined ? pages : pages.slice(0, Math.max(0, pageLimit));
   return (
     <div
       className={`${styles.renderer} ${className ?? ""}`}
@@ -174,7 +177,7 @@ export function ResumeRenderer({ document, design, pageFormat, mode = "editor", 
       style={rendererVariables(design, format)}
     >
       {mode === "print" ? <style>{`@page { size: ${format === "A4" ? "A4" : "Letter"}; margin: 0; }`}</style> : null}
-      {paginateResume({ ...document, sections }, design, format).map((page) => (
+      {visiblePages.map((page) => (
         <article className={styles.page} data-resume-page={page.number} key={page.number}>
           {page.showHeader ? <Header document={document} design={design} assetUrls={assetUrls} /> : null}
           <SectionLayout sections={page.sections} design={design} assetUrls={assetUrls} />

@@ -64,6 +64,7 @@ describe("DashboardLibrary", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Loading resumes");
     expect(await screen.findByText("Resume Germany")).toBeVisible();
     expect(screen.getByTestId("shared-resume-renderer")).toHaveAttribute("data-mode", "thumbnail");
+    expect(screen.getByTestId("shared-resume-renderer")).toHaveAttribute("data-page-limit", "1");
     expect(fetchMock).toHaveBeenCalledWith("/api/resumes", expect.objectContaining({ cache: "no-store" }));
   });
 

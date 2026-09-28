@@ -119,6 +119,24 @@ export function ResumeEditor({
     void action().catch((cause) => setActionError(cause instanceof Error ? cause.message : "The action could not be completed."));
   };
 
+  const moveSection = (from: number, to: number) => {
+    setDocument((current) => {
+      if (from === to || from < 0 || to < 0 || from >= current.sections.length || to >= current.sections.length) return current;
+      const sections = [...current.sections];
+      const [moved] = sections.splice(from, 1);
+      if (!moved) return current;
+      sections.splice(to, 0, moved);
+      return { ...current, sections };
+    });
+  };
+
+  const updateSectionStructure = (sectionId: string, patch: { column?: "primary" | "secondary" | "full"; visible?: boolean }) => {
+    setDocument((current) => ({
+      ...current,
+      sections: current.sections.map((section) => section.id === sectionId ? { ...section, ...patch } : section),
+    }));
+  };
+
   return (
     <div className={styles.editor}>
       <header className={styles.toolbar}>
@@ -164,7 +182,10 @@ export function ResumeEditor({
             <CustomizePanel
               design={design}
               onChange={setDesign}
-              sections={document.sections.map((section) => ({ id: section.id, label: section.heading, type: section.type }))}
+              sections={document.sections.map((section) => ({ id: section.id, label: section.heading, type: section.type, column: section.column, visible: section.visible }))}
+              onSectionMove={moveSection}
+              onSectionColumnChange={(sectionId, column) => updateSectionStructure(sectionId, { column })}
+              onSectionVisibilityChange={(sectionId, visible) => updateSectionStructure(sectionId, { visible })}
               photoAsset={{ present: Boolean(document.personal.photo), previewUrl: photoUrl, alt: document.personal.photo?.alt }}
               onPhotoUpload={uploadPhoto}
               onPhotoRemove={() => { setPhotoUrl(undefined); setDocument((current) => ({ ...current, personal: { ...current.personal, photo: undefined } })); }}
@@ -173,7 +194,7 @@ export function ResumeEditor({
           <input ref={uploadRef} className={styles.hiddenInput} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPhoto(file).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Photo upload failed.")); event.currentTarget.value = ""; }} />
         </section>
         <section className={styles.previewWorkspace} aria-label="Live resume preview">
-          <div className={styles.previewScale} data-page-format={design.document.pageFormat}>
+          <div className={styles.previewScale} data-preview-scale="true" data-page-format={design.document.pageFormat}>
             <ResumeRenderer document={document} design={design} pageFormat={design.document.pageFormat} mode="editor" assetUrls={assetUrls} />
           </div>
         </section>

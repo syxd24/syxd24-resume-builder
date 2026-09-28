@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createDefaultResumeDocument, resumeDocumentSchema } from "@/domain/resume/schema";
 import { ContentEditor } from "@/features/editor/content";
 import { SECTION_CATALOG } from "@/features/editor/content/factories";
-import type { ResumeDocument } from "@/domain/resume/schema";
 
 function ControlledEditor({ onDocument }: { onDocument?: (value: ReturnType<typeof createDefaultResumeDocument>) => void }) {
   const [document, setDocument] = useState(createDefaultResumeDocument);
@@ -51,13 +50,19 @@ describe("ContentEditor", () => {
     expect(next?.sections.at(-1)).toMatchObject({ type: "projects", entries: [], visible: true });
   });
 
-  it("offers keyboard-operable section reordering and persists the new array order", () => {
-    const changed = vi.fn();
-    render(<ControlledEditor onDocument={changed} />);
+  it("keeps section cards minimal and expands them without mounting and unmounting their editing fields", () => {
+    render(<ControlledEditor />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Move Professional Experience section down" }));
+    expect(screen.queryByRole("button", { name: /move professional experience section/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /hide summary section/i })).not.toBeInTheDocument();
 
-    const next = changed.mock.lastCall?.[0];
-    expect((next as ResumeDocument | undefined)?.sections.map((section) => section.type)).toEqual(["summary", "education", "experience", "skills"]);
+    const summaryToggle = screen.getByRole("button", { name: /profile/i });
+    const summaryBody = document.getElementById(summaryToggle.getAttribute("aria-controls") ?? "");
+    expect(summaryToggle).toHaveAttribute("aria-expanded", "false");
+    expect(summaryBody?.textContent).toContain("Profile summary");
+
+    fireEvent.click(summaryToggle);
+    expect(summaryToggle).toHaveAttribute("aria-expanded", "true");
+    expect(summaryBody?.textContent).toContain("Profile summary");
   });
 });

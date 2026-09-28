@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import type { SectionType } from "@/domain/resume/schema";
 import { AddContentModal } from "./AddContentModal";
-import { appendSection, moveSection } from "./document-operations";
+import { appendSection } from "./document-operations";
 import { PersonalDetailsCard } from "./PersonalDetailsCard";
 import { SectionCard } from "./SectionCard";
 import type { ContentEditorProps } from "./types";
@@ -18,7 +18,6 @@ export function ContentEditor({
 }: ContentEditorProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [newSectionId, setNewSectionId] = useState<string>();
-  const [dragSectionIndex, setDragSectionIndex] = useState<number | null>(null);
   const closeAdd = useCallback(() => setAddOpen(false), []);
 
   const addSection = (type: Exclude<SectionType, "summary">) => {
@@ -26,15 +25,6 @@ export function ContentEditor({
     setNewSectionId(result.section.id);
     onChange(result.document, { reason: "section-add", sectionId: result.section.id });
     setAddOpen(false);
-  };
-
-  const reorder = (from: number, to: number) => {
-    if (from === to) return;
-    const sectionId = document.sections[from]?.id;
-    onChange(moveSection(document, from, to), {
-      reason: "section-reorder",
-      sectionId,
-    });
   };
 
   return (
@@ -57,22 +47,12 @@ export function ContentEditor({
       />
 
       <div className={styles.sectionList} aria-label="Resume sections">
-        {document.sections.map((section, index) => (
+        {document.sections.map((section) => (
           <SectionCard
             key={section.id}
             document={document}
             section={section}
-            index={index}
-            total={document.sections.length}
             onChange={onChange}
-            onMove={reorder}
-            onSectionDragStart={setDragSectionIndex}
-            onSectionDragEnd={() => setDragSectionIndex(null)}
-            onSectionDrop={(targetIndex) => {
-              if (dragSectionIndex !== null) reorder(dragSectionIndex, targetIndex);
-              setDragSectionIndex(null);
-            }}
-            dragging={dragSectionIndex === index}
             initiallyExpanded={newSectionId === section.id}
           />
         ))}

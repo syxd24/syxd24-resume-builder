@@ -22,14 +22,7 @@ import styles from "./content-editor.module.css";
 type SectionCardProps = {
   document: ResumeDocument;
   section: ResumeSection;
-  index: number;
-  total: number;
   onChange: (document: ResumeDocument, meta: ContentEditorChangeMeta) => void;
-  onMove: (from: number, to: number) => void;
-  onSectionDragStart: (index: number) => void;
-  onSectionDragEnd: () => void;
-  onSectionDrop: (index: number) => void;
-  dragging: boolean;
   initiallyExpanded?: boolean;
 };
 
@@ -41,6 +34,10 @@ function SectionIcon({ type }: { type: ResumeSection["type"] }) {
   if (type === "certificates" || type === "awards") return <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5" /><path d="m9 13-1 7 4-2 4 2-1-7" /></svg>;
   if (type === "summary") return <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h8M8 13h6" /></svg>;
   return <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2" /><path d="M9 9h6M9 13h6" /></svg>;
+}
+
+function ChevronIcon() {
+  return <svg viewBox="0 0 24 24"><path d="m7 9.5 5 5 5-5" /></svg>;
 }
 
 function entryLabel(entry: ResumeEntry, index: number): string {
@@ -175,11 +172,13 @@ function EntryCard({
           <button type="button" className={styles.dangerIconButton} aria-label={`Delete ${label}`} onClick={deleteEntry}>×</button>
         </div>
       </header>
-      {expanded ? (
-        <div ref={bodyRef} id={`entry-${entry.id}`} className={styles.entryBody}>
-          <EntryEditor sectionType={section.type} entry={entry} onChange={changeEntry} />
+      <div className={styles.collapse} data-expanded={expanded}>
+        <div className={styles.collapseInner} aria-hidden={!expanded} inert={!expanded}>
+          <div ref={bodyRef} id={`entry-${entry.id}`} className={styles.entryBody}>
+            <EntryEditor sectionType={section.type} entry={entry} onChange={changeEntry} />
+          </div>
         </div>
-      ) : null}
+      </div>
     </article>
   );
 }
@@ -187,14 +186,7 @@ function EntryCard({
 export function SectionCard({
   document,
   section,
-  index,
-  total,
   onChange,
-  onMove,
-  onSectionDragStart,
-  onSectionDragEnd,
-  onSectionDrop,
-  dragging,
   initiallyExpanded = false,
 }: SectionCardProps) {
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -240,24 +232,10 @@ export function SectionCard({
 
   return (
     <section
-      className={`${styles.card} ${section.visible ? "" : styles.muted} ${dragging ? styles.dragging : ""}`}
+      className={`${styles.card} ${section.visible ? "" : styles.muted}`}
       aria-labelledby={`section-title-${section.id}`}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        onSectionDrop(index);
-      }}
     >
       <header className={styles.cardHeader}>
-        <button
-          type="button"
-          draggable
-          className={styles.dragHandleButton}
-          aria-label={`Drag ${section.heading} section to reorder`}
-          title="Drag to reorder"
-          onDragStart={() => onSectionDragStart(index)}
-          onDragEnd={onSectionDragEnd}
-        >⠿</button>
         <button
           type="button"
           className={styles.sectionToggle}
@@ -270,17 +248,13 @@ export function SectionCard({
             <strong id={`section-title-${section.id}`}>{section.heading}</strong>
             <small>{status}</small>
           </span>
-          <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span>
+          <span className={styles.chevron} aria-hidden="true"><ChevronIcon /></span>
         </button>
-        <div className={styles.rowControls}>
-          <button type="button" className={styles.iconButton} disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label={`Move ${section.heading} section up`}>↑</button>
-          <button type="button" className={styles.iconButton} disabled={index === total - 1} onClick={() => onMove(index, index + 1)} aria-label={`Move ${section.heading} section down`}>↓</button>
-          <button type="button" className={styles.iconButton} onClick={() => updateSettings({ visible: !section.visible })} aria-label={`${section.visible ? "Hide" : "Show"} ${section.heading} section`}>{section.visible ? "◉" : "○"}</button>
-        </div>
       </header>
 
-      {expanded ? (
-        <div id={`section-body-${section.id}`} className={styles.cardBody}>
+      <div className={styles.collapse} data-expanded={expanded}>
+        <div className={styles.collapseInner} aria-hidden={!expanded} inert={!expanded}>
+          <div id={`section-body-${section.id}`} className={styles.cardBody}>
           <div className={styles.sectionSettings}>
             {renaming ? (
               <div className={styles.renameRow}>
@@ -292,14 +266,6 @@ export function SectionCard({
             ) : (
               <button type="button" className={styles.textButton} onClick={() => setRenaming(true)}>Edit heading</button>
             )}
-            <label className={styles.compactField}>
-              <span>Column placement</span>
-              <select value={section.column} onChange={(event) => updateSettings({ column: event.target.value as ResumeSection["column"] })}>
-                <option value="full">Full width</option>
-                <option value="primary">Primary column</option>
-                <option value="secondary">Secondary column</option>
-              </select>
-            </label>
             {section.type !== "summary" ? (
               <button type="button" className={styles.dangerTextButton} onClick={deleteSection}>Delete section</button>
             ) : null}
@@ -366,8 +332,9 @@ export function SectionCard({
               <button type="button" className={styles.addEntryButton} onClick={addEntry}>+ Add entry</button>
             </div>
           ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

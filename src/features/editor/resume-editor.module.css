@@ -34,10 +34,14 @@
 .errorBanner { padding: 10px 20px; background: #fff0f1; color: #901f2e; text-align: center; font-size: 14px; font-weight: 650; }
 .workspace { display: grid; grid-template-columns: minmax(540px, 50vw) minmax(0, 1fr); height: calc(100vh - 86px); margin-top: 12px; }
 .controls { overflow: auto; scroll-behavior: smooth; scrollbar-gutter: stable; border-right: 1px solid #e1dce5; background: #f5f3ef; }
+.workspace[data-mode="customize"] { grid-template-columns: minmax(560px, 656px) minmax(0, 800px); justify-content: center; }
+.workspace[data-mode="customize"] .controls { overflow: hidden; }
+.workspace[data-mode="customize"] .previewWorkspace { padding-inline: 4px; }
 .previewWorkspace { overflow: auto; scroll-behavior: smooth; scrollbar-gutter: stable; padding: 24px clamp(16px, 2vw, 32px) 64px; background: #e9e6e3; }
 .previewScale { width: 210mm; margin: 0 auto; transform-origin: top center; }
 .previewScale[data-page-format="Letter"] { width: 8.5in; }
 .hiddenInput { position: absolute; width: 1px; height: 1px; clip: rect(0 0 0 0); overflow: hidden; }
+@media (min-width: 1651px) { .workspace[data-mode="customize"] .previewScale { zoom: .96; } }
 @media (max-width: 1650px) { .previewScale { transform: none; zoom: .8; } }
 @media (max-width: 1320px) { .previewScale { transform: none; zoom: .68; } .workspace { grid-template-columns: minmax(500px, 50vw) minmax(0, 1fr); } }
 @media (max-width: 1100px) {
@@ -45,6 +49,7 @@
   .toolbarCenter { grid-column: 1 / -1; grid-row: 2; }
   .workspace { height: calc(100vh - 128px); }
   .workspace { grid-template-columns: minmax(390px, 52vw) minmax(0, 1fr); }
+  .workspace[data-mode="customize"] { grid-template-columns: minmax(470px, 52vw) minmax(0, 1fr); justify-content: stretch; }
   .previewWorkspace { padding: 28px 14px 48px; }
   .previewScale { transform: none; margin: 0 auto; zoom: .58; }
 }
@@ -53,6 +58,7 @@
   .toolbarCenter { grid-column: 1 / -1; grid-row: 2; }
   .workspace { display: block; height: auto; }
   .controls { max-height: none; overflow: visible; border-right: 0; border-bottom: 1px solid #ddd7e5; }
+  .workspace[data-mode="customize"] .controls { overflow: visible; }
   .previewWorkspace { min-height: 520px; overflow: hidden; }
   .previewScale { zoom: .72; }
 }

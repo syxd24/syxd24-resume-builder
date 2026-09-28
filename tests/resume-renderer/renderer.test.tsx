@@ -5,7 +5,7 @@ import fixtureDesign from "../../fixtures/default-design.json";
 import fixtureDocument from "../../fixtures/golden-resume.json";
 import { resumeDesignSchema, resumeDocumentSchema, type ResumeDocument } from "@/domain/resume";
 import { ResumeRenderer } from "@/features/resume-renderer/ResumeRenderer";
-import { formatDateRange, PAGE_DIMENSIONS } from "@/features/resume-renderer/format";
+import { fontStack, formatDateRange, PAGE_DIMENSIONS } from "@/features/resume-renderer/format";
 import { paginateResume } from "@/features/resume-renderer/pagination";
 
 const document = resumeDocumentSchema.parse(fixtureDocument);
@@ -15,6 +15,12 @@ describe("ResumeRenderer", () => {
   it("uses physical A4 and Letter dimensions", () => {
     expect(PAGE_DIMENSIONS.A4).toMatchObject({ widthMm: 210, heightMm: 297 });
     expect(PAGE_DIMENSIONS.Letter).toMatchObject({ widthMm: 215.9, heightMm: 279.4 });
+  });
+
+  it("maps professional font choices to the bundled font variables", () => {
+    expect(fontStack("Source Sans 3")).toContain("var(--font-source-sans-3)");
+    expect(fontStack("Open Sans")).toContain("var(--font-open-sans)");
+    expect(fontStack("Libre Baskerville")).toContain("var(--font-libre-baskerville)");
   });
 
   it("formats date ranges using locale-aware design metadata", () => {
@@ -31,6 +37,19 @@ describe("ResumeRenderer", () => {
     expect(container.querySelector('[data-resume-page="1"]')).toBeTruthy();
     expect(container.querySelectorAll("[data-resume-page]")).toHaveLength(1);
     expect(screen.getAllByText("LANGUAGES")).toHaveLength(1);
+  });
+
+  it("can limit dashboard rendering to the complete first page", () => {
+    const experience = document.sections.find((section) => section.type === "experience");
+    if (!experience || experience.type !== "experience") throw new Error("Fixture experience missing");
+    const longDocument: ResumeDocument = {
+      ...document,
+      sections: [{ ...experience, entries: Array.from({ length: 45 }, (_, index) => ({ ...experience.entries[0]!, id: `thumb-${index}` })) }],
+    };
+
+    const { container } = render(<ResumeRenderer document={longDocument} design={design} mode="thumbnail" pageLimit={1} />);
+    expect(container.querySelectorAll("[data-resume-page]")).toHaveLength(1);
+    expect(container.querySelector('[data-resume-page="1"]')).toBeTruthy();
   });
 
   it("paginates a long resume without duplicating or dropping entries", () => {

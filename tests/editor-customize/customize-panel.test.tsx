@@ -2,12 +2,14 @@
 
 import "@testing-library/jest-dom/vitest";
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import React, { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { defaultResumeDesign, type ResumeDesign } from "@/domain/resume";
 import { CustomizePanel, type CustomizePanelProps } from "@/features/editor/customize";
+
+afterEach(cleanup);
 
 function Harness({ onDesignChange = () => undefined, ...props }: Omit<CustomizePanelProps, "design" | "onChange"> & { onDesignChange?: (design: ResumeDesign) => void }) {
   const [design, setDesign] = useState(defaultResumeDesign);
@@ -23,6 +25,23 @@ describe("CustomizePanel", () => {
     for (const label of ["Document", "Templates", "Layout", "Font Size", "Spacing", "Entries", "Headings", "Font", "Colors", "Header", "Photo", "Links", "Footer", "Sections"]) {
       expect(within(navigation).getByRole("button", { name: label })).toBeInTheDocument();
     }
+
+    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      "Document settings",
+      "Design template",
+      "Layout",
+      "Font size",
+      "Spacing",
+      "Entries",
+      "Headings",
+      "Font",
+      "Colors",
+      "Header",
+      "Photo",
+      "Link styling",
+      "Footer",
+      "Section customizations",
+    ]);
 
     fireEvent.change(screen.getByLabelText("Language"), { target: { value: "de-DE" } });
     expect(onDesignChange).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -107,5 +126,41 @@ describe("CustomizePanel", () => {
       }),
     }));
     expect(screen.getAllByLabelText("Skill presentation")).toHaveLength(1);
+  });
+
+  it("moves section ordering and visibility into Customize with keyboard-accessible layout rows", () => {
+    const onSectionMove = vi.fn();
+    const onSectionVisibilityChange = vi.fn();
+    render(<Harness
+      sections={[
+        { id: "experience", label: "Professional Experience", type: "experience", visible: true, column: "full" },
+        { id: "skills", label: "Skills", type: "skills", visible: true, column: "full" },
+      ]}
+      onSectionMove={onSectionMove}
+      onSectionVisibilityChange={onSectionVisibilityChange}
+    />);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /reorder professional experience/i }), { key: "ArrowDown" });
+    expect(onSectionMove).toHaveBeenCalledWith(0, 1);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show Professional Experience" }));
+    expect(onSectionVisibilityChange).toHaveBeenCalledWith("experience", false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Layout" }));
+    expect(screen.getByRole("button", { name: "Layout" })).toHaveAttribute("aria-current", "location");
+  });
+
+  it("offers the professional self-hosted resume font set", () => {
+    const onDesignChange = vi.fn();
+    render(<Harness onDesignChange={onDesignChange} />);
+    const bodyFont = screen.getByLabelText("Body font");
+    for (const font of ["Source Sans 3", "Inter", "Lato", "Open Sans", "Roboto", "Merriweather", "Libre Baskerville"]) {
+      expect(within(bodyFont).getByRole("option", { name: font })).toBeInTheDocument();
+    }
+    fireEvent.change(bodyFont, { target: { value: "Source Sans 3" } });
+    expect(bodyFont).toHaveValue("Source Sans 3");
+    expect(onDesignChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      typography: expect.objectContaining({ bodyFont: "Source Sans 3" }),
+    }));
   });
 });

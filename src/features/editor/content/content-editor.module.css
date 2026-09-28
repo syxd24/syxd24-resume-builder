@@ -119,6 +119,11 @@
   gap: 10px;
   min-height: 74px;
   padding: 14px 18px;
+  transition: background-color 180ms ease;
+}
+
+.cardHeader:hover {
+  background: #fdfcfe;
 }
 
 .personalSummary {
@@ -277,6 +282,31 @@
   gap: 18px;
   padding: 20px;
   border-top: 1px solid var(--content-border);
+}
+
+.collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transition: grid-template-rows 280ms cubic-bezier(.2, .75, .25, 1), opacity 180ms ease;
+}
+
+.collapse[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.collapseInner {
+  min-height: 0;
+  overflow: hidden;
+  transform: translateY(-5px);
+  transition: transform 280ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.collapse[data-expanded="true"] > .collapseInner {
+  transform: translateY(0);
 }
 
 .formGrid {
@@ -528,11 +558,6 @@
   cursor: pointer;
 }
 
-.card:has(.sectionToggle[aria-expanded="false"]) > .cardHeader > .dragHandleButton,
-.card:has(.sectionToggle[aria-expanded="false"]) > .cardHeader > .rowControls {
-  display: none;
-}
-
 .sectionToggle[aria-expanded="false"] .sectionHeadingText small {
   display: none;
 }
@@ -563,6 +588,36 @@
   color: var(--content-muted);
   font-size: 0.72rem;
   font-weight: 500;
+}
+
+.chevron {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  color: #736d7d;
+  transition: color 180ms ease, background-color 180ms ease, transform 260ms cubic-bezier(.2, .75, .25, 1);
+}
+
+.chevron svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.sectionToggle:hover .chevron {
+  color: var(--content-ink);
+  background: #f2eff6;
+}
+
+.sectionToggle[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
 }
 
 .sectionSettings {
@@ -1034,7 +1089,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card {
+  .card,
+  .collapse,
+  .collapseInner,
+  .chevron {
     transition: none;
   }
 }

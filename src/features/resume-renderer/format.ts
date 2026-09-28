@@ -76,12 +76,17 @@ export function phoneHref(phone: string): string {
 }
 
 const FONT_STACKS: Record<string, string> = {
-  Alegreya: '"Alegreya", Inter, "Source Sans 3", "Segoe UI", Arial, ui-sans-serif, system-ui, sans-serif',
+  Alegreya: 'var(--font-alegreya), "Alegreya", Georgia, serif',
+  Arial: 'Arial, "Helvetica Neue", sans-serif',
   Georgia: 'Georgia, "Times New Roman", serif',
-  Inter: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
-  Lato: 'Lato, ui-sans-serif, system-ui, sans-serif',
-  Merriweather: 'Merriweather, Georgia, "Times New Roman", serif',
-  "Source Sans 3": '"Source Sans 3", "Segoe UI", Arial, sans-serif',
+  Inter: 'var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif',
+  Lato: 'var(--font-lato), "Lato", Arial, sans-serif',
+  "Libre Baskerville": 'var(--font-libre-baskerville), "Libre Baskerville", Georgia, serif',
+  Merriweather: 'var(--font-merriweather), "Merriweather", Georgia, serif',
+  "Open Sans": 'var(--font-open-sans), "Open Sans", Arial, sans-serif',
+  Roboto: 'var(--font-roboto), "Roboto", Arial, sans-serif',
+  "Source Sans 3": 'var(--font-source-sans-3), "Source Sans 3", "Source Sans Pro", Arial, sans-serif',
+  "Source Sans Pro": 'var(--font-source-sans-3), "Source Sans 3", "Source Sans Pro", Arial, sans-serif',
   "Times New Roman": '"Times New Roman", Times, serif',
 };
 

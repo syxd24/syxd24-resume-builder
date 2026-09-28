@@ -115,6 +115,74 @@ test("library visual at 1440x900 uses two real resume thumbnails", async ({ page
   await expect(page).toHaveScreenshot("library-1440x900.png", { animations: "disabled" });
 });
 
+test("dashboard thumbnail fits one complete first page without cropping", async ({ page }) => {
+  await page.route("**/api/resumes", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ resumes: [record("Resume Germany", "2026-01-03T00:00:00.000Z")] }),
+    });
+  });
+  await page.goto("/resumes");
+  const thumbnail = page.locator('[data-resume-thumbnail="true"]');
+  const fittedPage = thumbnail.locator('[data-thumbnail-page="true"]');
+  await expect(thumbnail.locator("[data-resume-page]")).toHaveCount(1);
+  await expect.poll(async () => {
+    const viewportBox = await thumbnail.boundingBox();
+    const pageBox = await fittedPage.boundingBox();
+    if (!viewportBox || !pageBox) return false;
+    return pageBox.x >= viewportBox.x
+      && pageBox.y >= viewportBox.y
+      && pageBox.x + pageBox.width <= viewportBox.x + viewportBox.width + 0.5
+      && pageBox.y + pageBox.height <= viewportBox.y + viewportBox.height + 0.5;
+  }).toBe(true);
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: path.join(outputDir, "dashboard-thumbnail-fit.png") });
+});
+
+test("Customize keeps settings close to a usable preview", async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 900 });
+  await openFixtureEditor(page);
+  await page.getByRole("tab", { name: "Customize" }).click();
+  const settings = page.locator('[data-customize-settings="true"]');
+  const preview = page.locator('[data-preview-scale="true"]');
+  await expect(settings).toBeVisible();
+  const settingsBox = await settings.boundingBox();
+  const previewBox = await preview.boundingBox();
+  expect(settingsBox).not.toBeNull();
+  expect(previewBox).not.toBeNull();
+  expect(previewBox!.x - (settingsBox!.x + settingsBox!.width)).toBeLessThan(100);
+  expect(previewBox!.width).toBeGreaterThan(700);
+  mkdirSync(outputDir, { recursive: true });
+  await page.screenshot({ path: path.join(outputDir, "customize-layout-gap.png") });
+
+  for (const viewport of [{ width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await expectNoDocumentOverflow(page);
+  }
+});
+
+test("selected resume font matches between editor preview and PDF print source", async ({ page }) => {
+  await openFixtureEditor(page);
+  await page.getByRole("tab", { name: "Customize" }).click();
+  await page.getByRole("button", { name: "Font", exact: true }).click();
+  await page.getByLabel("Body font").selectOption("Source Sans 3");
+  await page.evaluate(async () => { await document.fonts.ready; });
+  const editorFamily = await page.locator('[data-render-mode="editor"]').evaluate((element) => getComputedStyle(element).fontFamily);
+  expect(editorFamily).toContain("Source Sans 3");
+
+  await page.goto("/__qa/visual-pdf?view=golden-print&font=Source%20Sans%203");
+  await expect(page.locator('[data-qa-ready="true"]')).toBeVisible();
+  await page.evaluate(async () => { await document.fonts.ready; });
+  const printFamily = await page.locator('[data-render-mode="print"]').evaluate((element) => getComputedStyle(element).fontFamily);
+  expect(printFamily).toBe(editorFamily);
+
+  mkdirSync(outputDir, { recursive: true });
+  const pdfPath = path.join(outputDir, "source-sans-3.pdf");
+  await page.emulateMedia({ media: "print" });
+  await page.pdf({ path: pdfPath, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false });
+  expect((await inspectPdf(pdfPath)).text).toContain("Alex Morgan");
+});
+
 test("library remains usable at a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/resumes", async (route) => {
