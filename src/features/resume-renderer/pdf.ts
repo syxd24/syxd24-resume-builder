@@ -12,7 +12,7 @@ function safeFilename(title: string): string {
   return `${value || "resume"}.pdf`;
 }
 
-export async function renderResumePdf(resume: ResumeRecord): Promise<ResumePdf> {
+export async function renderResumePdf(resume: ResumeRecord, appOrigin: string): Promise<ResumePdf> {
   const env = getServerEnv();
   const serverless = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
   const browser = await playwrightChromium.launch({
@@ -28,7 +28,7 @@ export async function renderResumePdf(resume: ResumeRecord): Promise<ResumePdf> 
         "x-vercel-set-bypass-cookie": "true",
       });
     }
-    const url = new URL(`/resumes/${resume.id}/print`, env.APP_URL);
+    const url = new URL(`/resumes/${resume.id}/print`, appOrigin);
     const response = await page.goto(url.href, { waitUntil: "networkidle", timeout: 30_000 });
     if (!response?.ok()) throw new Error(`Print page returned ${response?.status() ?? "no response"}.`);
     await page.waitForSelector('[data-print-ready="true"]', { state: "attached", timeout: 10_000 });
