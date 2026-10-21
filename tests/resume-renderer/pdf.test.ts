@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import path from "node:path";
 
 import type { ResumeRecord } from "@/data/resumes";
 
@@ -52,7 +53,9 @@ describe("renderResumePdf", () => {
 
     await renderResumePdf(resume, "https://resume-builder.example");
 
-    expect(executablePath).toHaveBeenCalledOnce();
+    expect(executablePath).toHaveBeenCalledWith(
+      path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin"),
+    );
     expect(page.goto).toHaveBeenCalledWith(
       `https://resume-builder.example/resumes/${resume.id}/print`,
       { waitUntil: "networkidle", timeout: 30_000 },

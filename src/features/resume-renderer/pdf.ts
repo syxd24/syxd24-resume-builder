@@ -1,5 +1,7 @@
 import "server-only";
 
+import path from "node:path";
+
 import serverlessChromium from "@sparticuz/chromium";
 import { chromium as playwrightChromium } from "playwright-core";
 
@@ -15,10 +17,13 @@ function safeFilename(title: string): string {
 export async function renderResumePdf(resume: ResumeRecord, appOrigin: string): Promise<ResumePdf> {
   const env = getServerEnv();
   const serverless = process.env.VERCEL === "1" || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+  const executablePath = serverless
+    ? await serverlessChromium.executablePath(path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin"))
+    : playwrightChromium.executablePath();
   const browser = await playwrightChromium.launch({
     headless: true,
     args: serverless ? serverlessChromium.args : [],
-    executablePath: serverless ? await serverlessChromium.executablePath() : playwrightChromium.executablePath(),
+    executablePath,
   });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
