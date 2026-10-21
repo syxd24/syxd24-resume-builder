@@ -172,10 +172,14 @@ function headingHeight(design: ResumeDesign): number {
 }
 
 function headerHeight(document: ResumeDocument, design: ResumeDesign): number {
-  const contacts = [document.personal.email, document.personal.phone, document.personal.location, document.personal.address, document.personal.website]
-    .filter(Boolean).length + document.personal.links.filter((link) => link.visible && link.url).length;
+  const standardContacts = [document.personal.email, document.personal.phone, document.personal.location, document.personal.website]
+    .filter(Boolean).length;
+  const address = document.personal.address && document.personal.address !== document.personal.location ? 1 : 0;
+  const links = document.personal.links.filter((link) => link.visible && link.url).length;
+  const details = document.personal.details.filter((detail) => detail.visible && detail.value.trim()).length;
+  const contacts = standardContacts + address + links + details;
   const contactLines = design.header.detailsArrangement === "stacked"
-    ? Math.min(contacts, 7)
+    ? contacts
     : design.header.detailsArrangement === "split"
       ? Math.ceil(contacts / 2)
       : Math.max(contacts ? 1 : 0, Math.ceil(contacts / 6));

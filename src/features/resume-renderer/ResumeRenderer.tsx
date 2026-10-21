@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { ResumeDesign, ResumeDocument, ResumeSection } from "@/domain/resume";
+import type { PersonalDetailKind, ResumeDesign, ResumeDocument, ResumeSection } from "@/domain/resume";
 
 import { emailHref, fontStack, PAGE_DIMENSIONS, phoneHref, safeHref, type PageFormat } from "./format";
 import { paginateResume } from "./pagination";
@@ -21,7 +21,36 @@ export type ResumeRendererProps = Readonly<{
 
 type RendererVariables = CSSProperties & Record<`--${string}`, string | number>;
 
-type ContactIconName = "email" | "phone" | "location" | "website";
+type ContactIconName = "email" | "phone" | "location" | "website" | "linkedin" | "github" | "work" | "identity" | "calendar" | "detail";
+
+function rgbFromHex(color: string): [number, number, number] {
+  const value = color.slice(1);
+  return [0, 2, 4].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16)) as [number, number, number];
+}
+
+function relativeLuminance(color: string): number {
+  const channels = rgbFromHex(color).map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const light = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const dark = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (light + 0.05) / (dark + 0.05);
+}
+
+function contactIconColor(design: ResumeDesign): string {
+  const preferred = design.colors.accentTargets.icons ? design.colors.accent : design.colors.body;
+  const candidates = [preferred, design.colors.body, "#171717", "#000000", "#FFFFFF"];
+  const strongContrast = candidates.find((candidate) => contrastRatio(candidate, design.colors.headerBackground) >= 7);
+  if (strongContrast) return strongContrast;
+  return candidates.reduce((best, candidate) => (
+    contrastRatio(candidate, design.colors.headerBackground) > contrastRatio(best, design.colors.headerBackground) ? candidate : best
+  ), candidates[0]!);
+}
 
 function linkColor(design: ResumeDesign): string {
   switch (design.links.colorMode) {
@@ -61,6 +90,7 @@ function rendererVariables(design: ResumeDesign, pageFormat: PageFormat): Render
     "--resume-rule-color": design.colors.accentTargets.rules ? design.colors.accent : design.colors.border,
     "--resume-header-background": design.colors.headerBackground,
     "--resume-link-color": linkColor(design),
+    "--resume-icon-color": contactIconColor(design),
     "--resume-rule-thickness": `${design.headings.ruleThicknessPt}pt`,
     "--resume-description-indent": design.entries.descriptionIndent ? `${design.entries.descriptionIndentMm}mm` : "0mm",
     "--resume-footer-gap": `${design.footer.gapMm}mm`,
@@ -73,23 +103,49 @@ function rendererVariables(design: ResumeDesign, pageFormat: PageFormat): Render
 
 function ContactIcon({ name }: { name: ContactIconName }) {
   const paths: Record<ContactIconName, ReactNode> = {
-    email: <path d="M2.25 4.5h15.5v11H2.25zM3 5.25l7 5 7-5" />,
-    phone: <path d="M5.2 2.75l2.35 3.7-1.7 1.7a14.2 14.2 0 0 0 6 6l1.7-1.7 3.7 2.35-.8 3.1c-.2.75-.9 1.25-1.65 1.2C7.3 18.55 1.45 12.7.9 5.2.85 4.45 1.35 3.75 2.1 3.55z" />,
-    location: <><path d="M10 18.2s5.2-5.25 5.2-10A5.2 5.2 0 0 0 4.8 8.2c0 4.75 5.2 10 5.2 10z" /><circle cx="10" cy="8.2" r="1.8" /></>,
-    website: <><circle cx="10" cy="10" r="7.75" /><path d="M2.5 10h15M10 2.25c2 2.15 3 4.75 3 7.75s-1 5.6-3 7.75C8 15.6 7 13 7 10s1-5.6 3-7.75z" /></>,
+    email: <><rect x="3" y="5" width="18" height="14" rx="1.5" /><path d="m4 6 8 6 8-6" /></>,
+    phone: <path d="M7.1 3.5 9.5 7.7 7.8 9.4a15.2 15.2 0 0 0 6.8 6.8l1.7-1.7 4.2 2.4-.8 3.1a2 2 0 0 1-2.1 1.5C9.5 20.8 3.2 14.5 2.5 6.4A2 2 0 0 1 4 4.3Z" />,
+    location: <><path d="M20 10c0 5.5-8 11-8 11S4 15.5 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
+    website: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z" /></>,
+    linkedin: <><rect x="3" y="3" width="18" height="18" rx="1.5" /><path d="M8 10v7M8 7.2v.1M11.5 17v-4a3 3 0 0 1 6 0v4M11.5 10v7" /></>,
+    github: <path className={styles.filledIcon} d="M12 2.6a9.6 9.6 0 0 0-3 18.7c.5.1.7-.2.7-.5v-1.9c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 0 1.6 1.1 1.6 1.1.9 1.6 2.4 1.1 2.9.9.1-.7.4-1.1.7-1.4-2.3-.3-4.7-1.1-4.7-5.1 0-1.1.4-2 1-2.8-.1-.3-.4-1.3.1-2.8 0 0 .8-.3 2.9 1.1a9.8 9.8 0 0 1 5.2 0c2-1.4 2.9-1.1 2.9-1.1.5 1.5.2 2.5.1 2.8.6.8 1 1.7 1 2.8 0 4-2.4 4.8-4.7 5.1.4.3.7 1 .7 1.9v2.7c0 .4.2.6.7.5A9.6 9.6 0 0 0 12 2.6Z" />,
+    work: <><rect x="3" y="7" width="18" height="13" rx="1.5" /><path d="M9 7V4h6v3M3 12h18M10 12v2h4v-2" /></>,
+    identity: <><rect x="3" y="5" width="18" height="14" rx="1.5" /><circle cx="8" cy="11" r="2" /><path d="M5.5 16c.6-1.7 1.4-2.5 2.5-2.5s1.9.8 2.5 2.5M13 10h5M13 14h5" /></>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="1.5" /><path d="M7 3v4M17 3v4M3 9h18" /></>,
+    detail: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></>,
   };
 
   return (
-    <svg className={styles.contactIcon} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <svg className={styles.contactIcon} data-contact-icon={name} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       {paths[name]}
     </svg>
   );
 }
 
-function ContactItem({ icon, href, children }: { icon?: ContactIconName; href?: string; children: ReactNode }) {
+function ContactItem({ icon, kind, href, children }: { icon?: ContactIconName; kind: string; href?: string; children: ReactNode }) {
   const safeUrl = safeHref(href);
-  const content = <>{icon ? <ContactIcon name={icon} /> : null}<span>{children}</span></>;
-  return safeUrl ? <a href={safeUrl} rel="noreferrer">{content}</a> : <span>{content}</span>;
+  const content = <>{icon ? <ContactIcon name={icon} /> : null}<span className={styles.contactText}>{children}</span></>;
+  return safeUrl
+    ? <a className={styles.contactItem} data-contact-kind={kind} href={safeUrl} rel="noreferrer">{content}</a>
+    : <span className={styles.contactItem} data-contact-kind={kind}>{content}</span>;
+}
+
+function iconForLink(label: string, url: string): ContactIconName {
+  const descriptor = `${label} ${url}`.toLowerCase();
+  if (descriptor.includes("linkedin.com") || descriptor.includes("linkedin")) return "linkedin";
+  if (descriptor.includes("github.com") || descriptor.includes("github")) return "github";
+  return "website";
+}
+
+function iconForDetail(kind: PersonalDetailKind): ContactIconName {
+  switch (kind) {
+    case "visa-status":
+    case "work-authorization": return "work";
+    case "nationality": return "identity";
+    case "date-of-birth": return "calendar";
+    case "additional":
+    case "custom": return "detail";
+  }
 }
 
 function Header({ document, design, assetUrls }: Pick<ResumeRendererProps, "document" | "design" | "assetUrls">) {
@@ -98,12 +154,22 @@ function Header({ document, design, assetUrls }: Pick<ResumeRendererProps, "docu
   const icon = (value: ContactIconName) => design.header.showIcons && design.links.showIcons ? value : undefined;
   const contacts: ReactNode[] = [];
 
-  if (personal.email) contacts.push(<ContactItem key="email" icon={icon("email")} href={emailHref(personal.email)}>{personal.email}</ContactItem>);
-  if (personal.phone) contacts.push(<ContactItem key="phone" icon={icon("phone")} href={phoneHref(personal.phone)}>{personal.phone}</ContactItem>);
-  if (personal.location || personal.address) contacts.push(<ContactItem key="location" icon={icon("location")}>{personal.location || personal.address}</ContactItem>);
-  if (personal.website) contacts.push(<ContactItem key="website" icon={icon("website")} href={personal.website}>{personal.website.replace(/^https?:\/\//, "")}</ContactItem>);
+  if (personal.email) contacts.push(<ContactItem key="email" kind="email" icon={icon("email")} href={emailHref(personal.email)}>{personal.email}</ContactItem>);
+  if (personal.phone) contacts.push(<ContactItem key="phone" kind="phone" icon={icon("phone")} href={phoneHref(personal.phone)}>{personal.phone}</ContactItem>);
+  if (personal.location) contacts.push(<ContactItem key="location" kind="location" icon={icon("location")}>{personal.location}</ContactItem>);
+  if (personal.address && personal.address !== personal.location) contacts.push(<ContactItem key="address" kind="address" icon={icon("location")}>{personal.address}</ContactItem>);
+  if (personal.website) contacts.push(<ContactItem key="website" kind="website" icon={icon("website")} href={personal.website}>{personal.website.replace(/^https?:\/\//, "")}</ContactItem>);
   for (const link of personal.links.filter((item) => item.visible && item.url)) {
-    contacts.push(<ContactItem key={link.id} icon={icon("website")} href={link.url}>{link.label || link.url}</ContactItem>);
+    const linkIcon = iconForLink(link.label, link.url);
+    contacts.push(<ContactItem key={link.id} kind={linkIcon} icon={icon(linkIcon)} href={link.url}>{link.label || link.url}</ContactItem>);
+  }
+  for (const detail of personal.details.filter((item) => item.visible && item.value.trim())) {
+    const label = detail.label.trim();
+    contacts.push(
+      <ContactItem key={detail.id} kind={`detail-${detail.kind}`} icon={icon(iconForDetail(detail.kind))}>
+        {label ? <><strong className={styles.contactLabel}>{label}:</strong>{" "}</> : null}{detail.value.trim()}
+      </ContactItem>,
+    );
   }
 
   const photo = design.photo.visible && photoUrl ? (

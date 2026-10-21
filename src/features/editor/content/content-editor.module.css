@@ -346,6 +346,17 @@
   font-weight: 500;
 }
 
+.addDetailPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #dfdbea;
+  border-radius: 10px;
+  background: var(--content-soft);
+}
+
 .field textarea {
   min-height: 82px;
   resize: vertical;
@@ -446,10 +457,28 @@
 }
 
 .linkList,
+.detailList,
 .entries,
 .sectionList {
   display: grid;
   gap: 12px;
+}
+
+.detailRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--content-border);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.detailFields {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(180px, 1.2fr);
+  gap: 10px;
 }
 
 .linkRow {
@@ -1036,6 +1065,11 @@
     grid-template-columns: 1fr;
     align-items: start;
   }
+
+  .detailRow {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
 }
 
 @media (max-width: 680px) {
@@ -1055,6 +1089,8 @@
   }
 
   .linkFields,
+  .detailFields,
+  .addDetailPanel,
   .catalogGrid {
     grid-template-columns: 1fr;
   }

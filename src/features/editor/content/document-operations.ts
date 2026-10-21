@@ -1,4 +1,6 @@
 import type {
+  PersonalDetail,
+  PersonalDetailKind,
   PersonalDetails,
   ResumeDocument,
   ResumeLink,
@@ -61,6 +63,69 @@ export function movePersonalLink(
 ): ResumeDocument {
   return updatePersonalDetails(document, {
     links: moveItem(document.personal.links, from, to),
+  });
+}
+
+export const PERSONAL_DETAIL_PRESETS = [
+  { kind: "visa-status", label: "Visa Status" },
+  { kind: "work-authorization", label: "Work Authorization" },
+  { kind: "nationality", label: "Nationality" },
+  { kind: "date-of-birth", label: "Date of Birth" },
+  { kind: "additional", label: "Additional contact information" },
+] as const satisfies ReadonlyArray<{
+  kind: Exclude<PersonalDetailKind, "custom">;
+  label: string;
+}>;
+
+export function addPersonalDetail(
+  document: ResumeDocument,
+  kind: PersonalDetailKind,
+): { document: ResumeDocument; detail: PersonalDetail } {
+  const preset = PERSONAL_DETAIL_PRESETS.find((candidate) => candidate.kind === kind);
+  const detail: PersonalDetail = {
+    id: createEditorId("detail"),
+    kind,
+    label: preset?.label ?? "Custom detail",
+    value: "",
+    visible: true,
+  };
+
+  return {
+    detail,
+    document: updatePersonalDetails(document, {
+      details: [...document.personal.details, detail],
+    }),
+  };
+}
+
+export function updatePersonalDetail(
+  document: ResumeDocument,
+  detailId: string,
+  patch: Partial<PersonalDetail>,
+): ResumeDocument {
+  return updatePersonalDetails(document, {
+    details: document.personal.details.map((detail) =>
+      detail.id === detailId ? { ...detail, ...patch } : detail,
+    ),
+  });
+}
+
+export function removePersonalDetail(
+  document: ResumeDocument,
+  detailId: string,
+): ResumeDocument {
+  return updatePersonalDetails(document, {
+    details: document.personal.details.filter((detail) => detail.id !== detailId),
+  });
+}
+
+export function movePersonalDetail(
+  document: ResumeDocument,
+  from: number,
+  to: number,
+): ResumeDocument {
+  return updatePersonalDetails(document, {
+    details: moveItem(document.personal.details, from, to),
   });
 }
 

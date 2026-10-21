@@ -3,6 +3,7 @@ import type { ResumeDocument, ResumeSection } from "@/domain/resume/schema";
 export type ContentEditorChangeMeta = {
   reason:
     | "personal"
+    | "personal-detail"
     | "personal-link"
     | "section-add"
     | "section-update"

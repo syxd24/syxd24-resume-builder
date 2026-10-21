@@ -242,7 +242,8 @@ for (const category of ["Document", "Font Size", "Colors"] as const) {
     await openFixtureEditor(page);
     await page.getByRole("tab", { name: "Customize" }).click();
     await page.getByRole("button", { name: category, exact: true }).click();
-    await expect(page.getByRole("heading", { name: category, exact: true, level: 1 })).toBeVisible();
+    const settingsHeading = category === "Document" ? "Document settings" : category === "Font Size" ? "Font size" : category;
+    await expect(page.getByRole("heading", { name: settingsHeading, exact: true, level: 2 })).toBeVisible();
 
     await expect(page).toHaveScreenshot(`customize-${category.toLowerCase().replace(" ", "-")}-1440x900.png`, { animations: "disabled" });
   });
@@ -254,9 +255,31 @@ test("golden resume visual and links", async ({ page }) => {
   await makeStable(page);
   await expect(page.getByRole("heading", { name: "Alex Morgan" })).toBeVisible();
   await expect(page.getByRole("link", { name: /GitHub/i })).toHaveAttribute("href", "https://github.com/example");
+  for (const icon of ["email", "phone", "location", "website", "linkedin", "github", "work"] as const) {
+    await expect(page.locator(`[data-contact-icon="${icon}"]`).first()).toBeVisible();
+  }
+  await expect(page.getByText(/Work Authorization:/)).toBeVisible();
+  await expect(page.getByText(/Authorized to work in the EU/)).toBeVisible();
   await expect(page.locator("[data-resume-page]")).toHaveCount(1);
 
   await expect(page).toHaveScreenshot("golden-resume-1440x900.png", { animations: "disabled", fullPage: true });
+});
+
+test("custom personal details update the preview and respect visibility", async ({ page }) => {
+  await openFixtureEditor(page);
+  await page.getByRole("button", { name: "Edit personal details" }).click();
+  await page.getByRole("button", { name: "Add details" }).click();
+  await page.getByLabel("Detail type").selectOption("custom");
+  await page.getByRole("button", { name: "Add field" }).click();
+
+  await page.getByLabel("Field name").last().fill("Security Clearance");
+  await page.getByLabel("Value").last().fill("Eligible");
+  await expect(page.locator('[data-render-mode="editor"]').getByText("Security Clearance:")).toBeVisible();
+  await expect(page.locator('[data-render-mode="editor"]').getByText("Eligible")).toBeVisible();
+
+  const customDetail = page.getByRole("article", { name: "Edit Security Clearance" });
+  await customDetail.getByRole("checkbox", { name: "Show" }).uncheck();
+  await expect(page.locator('[data-render-mode="editor"]').getByText("Security Clearance:")).toHaveCount(0);
 });
 
 test("stress fixture renders 3+ pages without DOM overflow or duplicate entries", async ({ page }) => {
@@ -307,8 +330,11 @@ test("generated PDFs have selectable source text, links in the source tree, and 
     expect(info.width).toBeCloseTo(variant.width, 0);
     expect(info.height).toBeCloseTo(variant.height, 0);
     expect(info.tagged).toBe(true);
-    expect(info.text).toContain("Alex Morgan");
-    expect(info.text).toContain("PROFESSIONAL EXPERIENCE");
+    const compactText = info.text.replace(/\s+/g, "");
+    expect(compactText).toContain("AlexMorgan");
+    expect(compactText).toContain("PROFESSIONALEXPERIENCE");
+    expect(compactText).toContain("WorkAuthorization:");
+    expect(compactText).toContain("AuthorizedtoworkintheEU");
     expect(info.links).toContain("https://github.com/example");
   }
 

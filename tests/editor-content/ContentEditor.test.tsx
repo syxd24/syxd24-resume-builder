@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { createDefaultResumeDocument, resumeDocumentSchema } from "@/domain/resume/schema";
+import {
+  createDefaultResumeDocument,
+  resumeDocumentSchema,
+  type ResumeDocument,
+} from "@/domain/resume/schema";
 import { ContentEditor } from "@/features/editor/content";
 import { SECTION_CATALOG } from "@/features/editor/content/factories";
 
@@ -30,6 +34,41 @@ describe("ContentEditor", () => {
     const next = changed.mock.lastCall?.[0];
     expect(next?.personal.fullName).toBe("Ada Lovelace");
     expect(resumeDocumentSchema.safeParse(next).success).toBe(true);
+  });
+
+  it("adds, renames, edits, hides, reorders and removes optional personal details", () => {
+    const changed = vi.fn();
+    render(<ControlledEditor onDocument={changed} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit personal details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add details" }));
+    fireEvent.change(screen.getByLabelText("Detail type"), { target: { value: "visa-status" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+
+    let row = screen.getByRole("article", { name: "Edit Visa Status" });
+    fireEvent.change(within(row).getByLabelText("Value"), { target: { value: "Polish residence permit" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add details" }));
+    fireEvent.change(screen.getByLabelText("Detail type"), { target: { value: "custom" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+
+    row = screen.getByRole("article", { name: "Edit Custom detail" });
+    fireEvent.change(within(row).getByLabelText("Field name"), { target: { value: "Availability" } });
+    row = screen.getByRole("article", { name: "Edit Availability" });
+    fireEvent.change(within(row).getByLabelText("Value"), { target: { value: "Immediate" } });
+    fireEvent.click(within(row).getByLabelText("Show"));
+    fireEvent.click(screen.getByRole("button", { name: "Move Availability up" }));
+
+    const reordered = changed.mock.lastCall?.[0] as ResumeDocument | undefined;
+    expect(reordered?.personal.details.map((detail) => detail.label)).toEqual(["Availability", "Visa Status"]);
+    expect(reordered?.personal.details[0]).toMatchObject({ value: "Immediate", visible: false });
+
+    row = screen.getByRole("article", { name: "Edit Availability" });
+    fireEvent.click(within(row).getByRole("button", { name: "Remove" }));
+    const removed = changed.mock.lastCall?.[0] as ResumeDocument | undefined;
+    expect(removed?.personal.details).toHaveLength(1);
+    expect(removed?.personal.details[0]).toMatchObject({ label: "Visa Status", value: "Polish residence permit" });
+    expect(resumeDocumentSchema.safeParse(removed).success).toBe(true);
   });
 
   it("shows the required Add Content choices in product order and creates a real section", () => {

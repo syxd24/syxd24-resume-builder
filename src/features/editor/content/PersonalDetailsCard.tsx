@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import type { PersonalDetails, ResumeDocument, ResumeLink } from "@/domain/resume/schema";
+import type {
+  PersonalDetail,
+  PersonalDetailKind,
+  PersonalDetails,
+  ResumeDocument,
+  ResumeLink,
+} from "@/domain/resume/schema";
 import {
+  addPersonalDetail,
   addPersonalLink,
+  movePersonalDetail,
   movePersonalLink,
+  PERSONAL_DETAIL_PRESETS,
+  removePersonalDetail,
   removePersonalLink,
+  updatePersonalDetail,
   updatePersonalDetails,
   updatePersonalLink,
 } from "./document-operations";
@@ -27,6 +38,8 @@ function PersonalContactIcon({ kind }: { kind: "email" | "phone" | "location" })
 
 export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }: PersonalDetailsCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [addingDetail, setAddingDetail] = useState(false);
+  const [detailKind, setDetailKind] = useState<PersonalDetailKind | "">("");
   const personal = document.personal;
 
   const update = (patch: Partial<PersonalDetails>) => {
@@ -38,6 +51,21 @@ export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }
       reason: "personal-link",
       entryId: link.id,
     });
+  };
+
+  const updateDetail = (detail: PersonalDetail, patch: Partial<PersonalDetail>) => {
+    onChange(updatePersonalDetail(document, detail.id, patch), {
+      reason: "personal-detail",
+      entryId: detail.id,
+    });
+  };
+
+  const addDetail = () => {
+    if (!detailKind) return;
+    const result = addPersonalDetail(document, detailKind);
+    onChange(result.document, { reason: "personal-detail", entryId: result.detail.id });
+    setDetailKind("");
+    setAddingDetail(false);
   };
 
   const summary = [personal.email, personal.phone, personal.location]
@@ -125,6 +153,98 @@ export function PersonalDetailsCard({ document, onChange, onRequestPhotoUpload }
             <TextField label="Address" value={personal.address} onChange={(address) => update({ address })} />
             <UrlField label="Website" value={personal.website} onChange={(website) => update({ website })} />
           </div>
+
+          <div className={styles.subsectionHeader}>
+            <div>
+              <h3>Additional details</h3>
+              <p>Add work authorization, nationality or your own named field.</p>
+            </div>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              aria-expanded={addingDetail}
+              aria-controls="personal-details-add-field"
+              onClick={() => setAddingDetail((current) => !current)}
+            >
+              Add details
+            </button>
+          </div>
+
+          {addingDetail ? (
+            <div id="personal-details-add-field" className={styles.addDetailPanel}>
+              <label className={styles.field}>
+                <span>Detail type</span>
+                <select
+                  value={detailKind}
+                  onChange={(event) => setDetailKind(event.target.value as PersonalDetailKind | "")}
+                >
+                  <option value="">Choose a field</option>
+                  {PERSONAL_DETAIL_PRESETS.map((option) => {
+                    const alreadyAdded = personal.details.some((detail) => detail.kind === option.kind);
+                    return (
+                      <option key={option.kind} value={option.kind} disabled={alreadyAdded}>
+                        {option.label}{alreadyAdded ? " (added)" : ""}
+                      </option>
+                    );
+                  })}
+                  <option value="custom">Custom field</option>
+                </select>
+              </label>
+              <div className={styles.inlineActions}>
+                <button type="button" className={styles.secondaryButton} disabled={!detailKind} onClick={addDetail}>
+                  Add field
+                </button>
+                <button type="button" className={styles.textButton} onClick={() => { setAddingDetail(false); setDetailKind(""); }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {personal.details.length ? (
+            <div className={styles.detailList} aria-label="Additional personal details">
+              {personal.details.map((detail, index) => (
+                <article
+                  key={detail.id}
+                  className={`${styles.detailRow} ${detail.visible ? "" : styles.muted}`}
+                  aria-label={`Edit ${detail.label || "optional detail"}`}
+                >
+                  <div className={styles.rowControls}>
+                    <span className={styles.dragHandle} aria-hidden="true">&#8943;</span>
+                    <button
+                      type="button"
+                      className={styles.iconButton}
+                      disabled={index === 0}
+                      onClick={() => onChange(movePersonalDetail(document, index, index - 1), { reason: "personal-detail", entryId: detail.id })}
+                      aria-label={`Move ${detail.label || "detail"} up`}
+                    >&#8593;</button>
+                    <button
+                      type="button"
+                      className={styles.iconButton}
+                      disabled={index === personal.details.length - 1}
+                      onClick={() => onChange(movePersonalDetail(document, index, index + 1), { reason: "personal-detail", entryId: detail.id })}
+                      aria-label={`Move ${detail.label || "detail"} down`}
+                    >&#8595;</button>
+                  </div>
+                  <div className={styles.detailFields}>
+                    <TextField label="Field name" value={detail.label} onChange={(label) => updateDetail(detail, { label })} />
+                    <TextField label="Value" value={detail.value} onChange={(value) => updateDetail(detail, { value })} />
+                  </div>
+                  <label className={styles.checkField}>
+                    <input type="checkbox" checked={detail.visible} onChange={(event) => updateDetail(detail, { visible: event.target.checked })} />
+                    <span>Show</span>
+                  </label>
+                  <button
+                    type="button"
+                    className={styles.dangerTextButton}
+                    onClick={() => onChange(removePersonalDetail(document, detail.id), { reason: "personal-detail", entryId: detail.id })}
+                  >
+                    Remove
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : null}
 
           <div className={styles.subsectionHeader}>
             <div>

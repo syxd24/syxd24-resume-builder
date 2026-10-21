@@ -20,7 +20,32 @@ describe("canonical resume schemas", () => {
   it("parses the golden resume fixture", () => {
     const parsed = resumeDocumentSchema.parse(fixture("golden-resume.json"));
     expect(parsed.personal.fullName).toBe("Alex Morgan");
+    expect(parsed.personal.details).toHaveLength(2);
+    expect(parsed.personal.details[1]).toMatchObject({
+      kind: "work-authorization",
+      visible: true,
+    });
     expect(parsed.sections.map((section) => section.type)).toContain("experience");
+  });
+
+  it("persists flexible personal details while remaining compatible with older documents", () => {
+    const document = createDefaultResumeDocument();
+    document.personal.details = [
+      {
+        id: "detail-work-authorization",
+        kind: "work-authorization",
+        label: "Work Authorization",
+        value: "Authorized to work in Poland | No sponsorship required",
+        visible: true,
+      },
+    ];
+
+    const roundTrip = resumeDocumentSchema.parse(JSON.parse(JSON.stringify(document)));
+    expect(roundTrip.personal.details).toEqual(document.personal.details);
+
+    const legacy = structuredClone(document) as unknown as { personal: Record<string, unknown> };
+    delete legacy.personal.details;
+    expect(resumeDocumentSchema.parse(legacy).personal.details).toEqual([]);
   });
 
   it("parses and fills defaults in the design fixture", () => {

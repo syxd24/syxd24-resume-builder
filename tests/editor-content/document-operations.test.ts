@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultResumeDocument, resumeDocumentSchema } from "@/domain/resume/schema";
 import {
+  addPersonalDetail,
   addPersonalLink,
   appendEntry,
   appendSection,
   copyEntry,
   moveEntry,
+  movePersonalDetail,
   moveSection,
   removeEntry,
+  removePersonalDetail,
   updateEntry,
+  updatePersonalDetail,
   updatePersonalLink,
   updateSectionSettings,
 } from "@/features/editor/content/document-operations";
@@ -91,5 +95,43 @@ describe("content document operations", () => {
       visible: false,
     });
     expect(resumeDocumentSchema.safeParse(document).success).toBe(true);
+  });
+
+  it("serializes optional personal details with their edits, visibility and order intact", () => {
+    let document = createDefaultResumeDocument();
+    const workAuthorization = addPersonalDetail(document, "work-authorization");
+    document = updatePersonalDetail(
+      workAuthorization.document,
+      workAuthorization.detail.id,
+      { value: "Authorized to work in Poland", visible: false },
+    );
+    const custom = addPersonalDetail(document, "custom");
+    document = updatePersonalDetail(custom.document, custom.detail.id, {
+      label: "Security clearance",
+      value: "Eligible",
+    });
+    document = movePersonalDetail(document, 1, 0);
+
+    const persisted = resumeDocumentSchema.parse(JSON.parse(JSON.stringify(document)));
+    expect(persisted.personal.details).toEqual([
+      {
+        id: custom.detail.id,
+        kind: "custom",
+        label: "Security clearance",
+        value: "Eligible",
+        visible: true,
+      },
+      {
+        id: workAuthorization.detail.id,
+        kind: "work-authorization",
+        label: "Work Authorization",
+        value: "Authorized to work in Poland",
+        visible: false,
+      },
+    ]);
+
+    const removed = removePersonalDetail(persisted, custom.detail.id);
+    expect(removed.personal.details).toEqual([persisted.personal.details[1]]);
+    expect(resumeDocumentSchema.safeParse(removed).success).toBe(true);
   });
 });

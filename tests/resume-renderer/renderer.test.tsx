@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import fixtureDesign from "../../fixtures/default-design.json";
 import fixtureDocument from "../../fixtures/golden-resume.json";
@@ -10,6 +10,8 @@ import { paginateResume } from "@/features/resume-renderer/pagination";
 
 const document = resumeDocumentSchema.parse(fixtureDocument);
 const design = resumeDesignSchema.parse(fixtureDesign);
+
+afterEach(cleanup);
 
 describe("ResumeRenderer", () => {
   it("uses physical A4 and Letter dimensions", () => {
@@ -37,6 +39,47 @@ describe("ResumeRenderer", () => {
     expect(container.querySelector('[data-resume-page="1"]')).toBeTruthy();
     expect(container.querySelectorAll("[data-resume-page]")).toHaveLength(1);
     expect(screen.getAllByText("LANGUAGES")).toHaveLength(1);
+  });
+
+  it("uses distinct, print-safe icons for standard contacts and recognized links", () => {
+    const { container } = render(<ResumeRenderer document={document} design={design} mode="print" />);
+
+    for (const icon of ["email", "phone", "location", "website", "linkedin", "github"]) {
+      expect(container.querySelector(`[data-contact-icon="${icon}"]`)).toBeTruthy();
+    }
+    expect(container.querySelector('[data-contact-kind="linkedin"]')?.getAttribute("href")).toBe("https://www.linkedin.com/in/example");
+    expect(container.querySelector('[data-contact-kind="github"]')?.getAttribute("href")).toBe("https://github.com/example");
+    expect(container.firstElementChild?.getAttribute("style")).toContain("--resume-icon-color: #244E64");
+  });
+
+  it("renders only visible nonempty flexible personal details in the header", () => {
+    const detailedDocument: ResumeDocument = {
+      ...document,
+      personal: {
+        ...document.personal,
+        details: [
+          { id: "work", kind: "work-authorization", label: "Work Authorization", value: "Authorized to work in Poland", visible: true },
+          { id: "visa", kind: "visa-status", label: "Visa Status", value: "", visible: true },
+          { id: "hidden", kind: "custom", label: "Hidden", value: "Do not render", visible: false },
+        ],
+      },
+    };
+    const { container } = render(<ResumeRenderer document={detailedDocument} design={design} />);
+
+    expect(screen.getAllByText("Work Authorization:").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Authorized to work in Poland").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Visa Status:")).toBeNull();
+    expect(screen.queryByText("Do not render")).toBeNull();
+    expect(container.querySelector('[data-contact-kind="detail-work-authorization"] [data-contact-icon="work"]')).toBeTruthy();
+  });
+
+  it("removes all contact icons when icon display is disabled", () => {
+    const withoutIcons = {
+      ...design,
+      header: { ...design.header, showIcons: false },
+    };
+    const { container } = render(<ResumeRenderer document={document} design={withoutIcons} />);
+    expect(container.querySelector("[data-contact-icon]")).toBeNull();
   });
 
   it("can limit dashboard rendering to the complete first page", () => {

@@ -11,6 +11,13 @@ type ResumePayload = {
       personal: {
         fullName: string;
         photo?: { storagePath: string; alt?: string };
+        details: Array<{
+          id: string;
+          kind: string;
+          label: string;
+          value: string;
+          visible: boolean;
+        }>;
       };
     };
   };
@@ -135,8 +142,15 @@ test.describe("live local acceptance", () => {
       await page.goto("/resumes");
       await expect(page.getByRole("heading", { name: "My Resumes" })).toBeVisible();
       await page.getByRole("button", { name: "New resume", exact: true }).click();
+      const createResponsePromise = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === "/api/resumes"
+          && response.request().method() === "POST",
+        { timeout: 30_000 },
+      );
       await page.getByRole("button", { name: "Start blank", exact: true }).click();
-      await expect(page).toHaveURL(new RegExp(`/resumes/${UUID}$`));
+      const createResponse = await createResponsePromise;
+      expect(createResponse.status(), await createResponse.text()).toBe(201);
+      await expect(page).toHaveURL(new RegExp(`/resumes/${UUID}$`), { timeout: 15_000 });
 
       const createdId = new URL(page.url()).pathname.split("/").at(-1);
       expect(createdId).toMatch(new RegExp(`^${UUID}$`));
@@ -163,6 +177,29 @@ test.describe("live local acceptance", () => {
       const persisted = await expectPersisted(request, createdId);
       expect(persisted).toMatchObject({ id: createdId, title: resumeTitle });
       expect(persisted.content.personal.fullName).toBe(fullName);
+
+      const detailValue = `Eligible ${runId}`;
+      await page.getByRole("button", { name: "Add details" }).click();
+      await page.getByLabel("Detail type").selectOption("custom");
+      await page.getByRole("button", { name: "Add field" }).click();
+      await page.getByLabel("Field name").last().fill("Security Clearance");
+      const detailSavePromise = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === `/api/resumes/${createdId}`
+          && response.request().method() === "PATCH",
+      );
+      await page.getByLabel("Value").last().fill(detailValue);
+      const detailSaveResponse = await detailSavePromise;
+      expect(detailSaveResponse.status(), await detailSaveResponse.text()).toBe(200);
+      await expect(page.getByRole("status")).toHaveText("Saved");
+
+      await page.reload();
+      await expandPersonalDetails(page);
+      const customDetail = page.getByRole("article", { name: "Edit Security Clearance" });
+      await expect(customDetail.getByLabel("Value")).toHaveValue(detailValue);
+      await expect(page.locator('[data-render-mode="editor"]').getByText(detailValue)).toBeVisible();
+      expect((await expectPersisted(request, createdId)).content.personal.details).toEqual(expect.arrayContaining([
+        expect.objectContaining({ kind: "custom", label: "Security Clearance", value: detailValue, visible: true }),
+      ]));
 
       const photoUploadPromise = page.waitForResponse((response) =>
         new URL(response.url()).pathname === `/api/resumes/${createdId}/photo`
@@ -221,6 +258,23 @@ test.describe("live local acceptance", () => {
       expect(deletedDuplicate.status()).toBe(404);
       createdResumeIds.delete(duplicate.id);
       deletedResumeIds.add(duplicate.id);
+
+      await page.goto(`/resumes/${createdId}`);
+      await expandPersonalDetails(page);
+      const detailDeletePromise = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === `/api/resumes/${createdId}`
+          && response.request().method() === "PATCH",
+      );
+      await page.getByRole("article", { name: "Edit Security Clearance" }).getByRole("button", { name: "Remove" }).click();
+      const detailDeleteResponse = await detailDeletePromise;
+      expect(detailDeleteResponse.status(), await detailDeleteResponse.text()).toBe(200);
+      await expect(page.getByRole("status")).toHaveText("Saved");
+      await page.reload();
+      await expandPersonalDetails(page);
+      await expect(page.getByRole("article", { name: "Edit Security Clearance" })).toHaveCount(0);
+      expect((await expectPersisted(request, createdId)).content.personal.details).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ label: "Security Clearance" }),
+      ]));
 
       const txtName = `TXT Candidate ${runId}`;
       const txtPayload = await importThroughUi(page, {

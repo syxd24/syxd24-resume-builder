@@ -28,6 +28,25 @@ export const resumeLinkSchema = z
   })
   .strict();
 
+export const personalDetailKindSchema = z.enum([
+  "visa-status",
+  "work-authorization",
+  "nationality",
+  "date-of-birth",
+  "additional",
+  "custom",
+]);
+
+export const personalDetailSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: personalDetailKindSchema.default("custom"),
+    label: z.string().max(200),
+    value: z.string().max(10_000),
+    visible: z.boolean().default(true),
+  })
+  .strict();
+
 export const richTextMarkSchema = z.enum(["bold", "italic", "underline"]);
 
 export const richTextSpanSchema = z
@@ -66,6 +85,7 @@ export const personalDetailsSchema = z
     address: optionalText,
     website: optionalUrl,
     links: z.array(resumeLinkSchema).max(100).default([]),
+    details: z.array(personalDetailSchema).max(100).default([]),
     photo: z
       .object({
         storagePath: z.string().min(1).max(1_000),
@@ -314,6 +334,8 @@ export const resumeDocumentSchema = z
 export type ResumeDate = z.infer<typeof resumeDateSchema>;
 export type DateRange = z.infer<typeof dateRangeSchema>;
 export type ResumeLink = z.infer<typeof resumeLinkSchema>;
+export type PersonalDetailKind = z.infer<typeof personalDetailKindSchema>;
+export type PersonalDetail = z.infer<typeof personalDetailSchema>;
 export type PersonalDetails = z.infer<typeof personalDetailsSchema>;
 export type SectionType = z.infer<typeof sectionTypeSchema>;
 export type SectionColumn = z.infer<typeof sectionColumnSchema>;

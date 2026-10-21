@@ -41,6 +41,19 @@ describe("resume import", () => {
     expect(result.document.sections.some((section) => section.type === "education")).toBe(true);
   });
 
+  it("does not misclassify an alphanumeric name suffix as a phone number", () => {
+    const result = classifyResumeText(`TXT Candidate 1792508969555-38cf2658289aa
+Platform Engineer
+
+SUMMARY
+Reliable TXT import.`);
+
+    expect(result.document.personal.fullName).toBe("TXT Candidate 1792508969555-38cf2658289aa");
+    expect(result.document.personal.phone).toBeUndefined();
+    expect(result.document.personal.jobTitle).toBe("Platform Engineer");
+    expect(result.unclassifiedText).toEqual([]);
+  });
+
   it("extracts real DOCX paragraph text without a paid service", async () => {
     const bytes = await minimalDocx("Alex Morgan\nEngineer\nSUMMARY\nDOCX content preserved.");
     const result = await extractResume("docx", bytes);
@@ -151,6 +164,154 @@ Q1 2026
     expect(experience).toMatchObject({
       type: "experience",
       entries: [{ description: [{ type: "bullet", text: "Built APIs." }, { type: "bullet", text: "Supported users." }] }],
+    });
+  });
+
+  it("maps the reference header without promoting LinkedIn to job title or creating fallback content", () => {
+    const result = classifyResumeText(`Syed Suhel Ahmed  linkedin.com/in/syed-suhel-ahmed
+syedsuhel26a@gmail.com  +48 513678988
+Kraków, Małopolskie, Poland  github.com/syxd24  Authorized to work in Poland | No sponsorship required
+
+SUMMARY
+Information Technology Graduate and Backend-focused Software Developer with experience building fintech and AI-enabled applications.
+
+PROFESSIONAL EXPERIENCE
+Junior Software Developer, CryptoMate
+• Developed backend features for payment transaction processing and customer account workflows.
+• Contributed to a GenAI support agent using Python and FastAPI.
+Kaunas, Lithuania 06/2025 – 04/2026
+
+PROJECTS
+SafeTrip AI — AI Travel Safety Report
+• Built a full-stack travel-safety application.
+
+EDUCATION
+Bachelor's Degree in Information Systems, Vytautas Magnus University 09/2022 – 06/2026 | Kaunas, Lithuania`);
+
+    expect(result.document.personal).toMatchObject({
+      fullName: "Syed Suhel Ahmed",
+      email: "syedsuhel26a@gmail.com",
+      phone: "+48 513678988",
+      location: "Kraków, Małopolskie, Poland",
+    });
+    expect(result.document.personal.jobTitle).toBeUndefined();
+    expect(result.document.personal.links.map(({ label, url }) => ({ label, url }))).toEqual([
+      { label: "LinkedIn", url: "https://linkedin.com/in/syed-suhel-ahmed" },
+      { label: "GitHub", url: "https://github.com/syxd24" },
+    ]);
+    expect(result.document.personal.details).toMatchObject([
+      { kind: "work-authorization", label: "Work Authorization", value: "Authorized to work in Poland | No sponsorship required", visible: true },
+    ]);
+    expect(result.document.sections.some((section) => section.type === "custom")).toBe(false);
+    expect(result.unclassifiedText).toEqual([]);
+
+    const experience = result.document.sections.find((section) => section.type === "experience");
+    expect(experience).toMatchObject({
+      type: "experience",
+      entries: [{
+        position: "Junior Software Developer",
+        employer: "CryptoMate",
+        location: "Kaunas, Lithuania",
+        dateRange: {
+          start: { month: 6, year: 2025, raw: "06/2025" },
+          end: { month: 4, year: 2026, raw: "04/2026" },
+          current: false,
+        },
+        description: [
+          { type: "bullet", text: "Developed backend features for payment transaction processing and customer account workflows." },
+          { type: "bullet", text: "Contributed to a GenAI support agent using Python and FastAPI." },
+        ],
+      }],
+    });
+
+    const project = result.document.sections.find((section) => section.type === "projects");
+    expect(project).toMatchObject({
+      type: "projects",
+      entries: [{ title: "SafeTrip AI", subtitle: "AI Travel Safety Report", description: [{ type: "bullet", text: "Built a full-stack travel-safety application." }] }],
+    });
+  });
+
+  it("recognizes explicit professional titles, visa details, additional contacts, and varied date layouts", () => {
+    const result = classifyResumeText(`Alex Morgan
+Professional Title: Senior Product Designer
+alex@example.com | alex.secondary@example.com | +1 (415) 555-0134
+Location: San Francisco, California, USA
+Visa Status: H-1B visa holder
+Nationality: Canadian | Date of Birth: 12 March 1990
+https://alexmorgan.design | www.linkedin.com/in/alex-morgan | github.com/alexmorgan
+
+CAREER HISTORY
+Senior Product Designer at Northstar Labs
+January 2022 to Present | Remote
+• Led research and product design across two platforms.
+
+ACADEMIC QUALIFICATIONS
+BFA Interaction Design
+State University
+Sep 2017 - May 2021 | Boston, Massachusetts`);
+
+    expect(result.document.personal).toMatchObject({
+      fullName: "Alex Morgan",
+      jobTitle: "Senior Product Designer",
+      email: "alex@example.com",
+      phone: "+1 (415) 555-0134",
+      location: "San Francisco, California, USA",
+      website: "https://alexmorgan.design/",
+    });
+    expect(result.document.personal.details).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "visa-status", value: "H-1B visa holder" }),
+      expect.objectContaining({ kind: "nationality", label: "Nationality", value: "Canadian" }),
+      expect.objectContaining({ kind: "date-of-birth", label: "Date of Birth", value: "12 March 1990" }),
+      expect.objectContaining({ kind: "additional", label: "Additional Email", value: "alex.secondary@example.com" }),
+    ]));
+    expect(result.document.personal.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "LinkedIn", url: "https://linkedin.com/in/alex-morgan" }),
+      expect.objectContaining({ label: "GitHub", url: "https://github.com/alexmorgan" }),
+    ]));
+
+    const experience = result.document.sections.find((section) => section.type === "experience");
+    expect(experience).toMatchObject({
+      type: "experience",
+      entries: [{ position: "Senior Product Designer", employer: "Northstar Labs", location: "Remote", dateRange: { current: true } }],
+    });
+    const education = result.document.sections.find((section) => section.type === "education");
+    expect(education).toMatchObject({
+      type: "education",
+      entries: [{ degree: "BFA Interaction Design", institution: "State University", location: "Boston, Massachusetts" }],
+    });
+  });
+
+  it("handles compact two-column extraction, inline section headings, and preserves only truly ambiguous text", () => {
+    const result = classifyResumeText(`PRIYA SHAH
+priya.shah.dev | London, England, United Kingdom
+github.com/priyashah | linkedin.com/in/priya-shah
+
+PROFILE: Platform engineer focused on resilient distributed systems.
+AREAS OF EXPERTISE: TypeScript, Kubernetes; Cloud: AWS, Terraform
+SELECTED PROJECTS
+Release Console — Technical Lead
+Mar 2023 – Dec 2023
+• Reduced deployment recovery time.
+LICENSES & CERTIFICATIONS
+Cloud Practitioner — Amazon Web Services
+2024
+COMMUNITY NOTES
+Mentors early-career engineers every month.`);
+
+    expect(result.document.personal).toMatchObject({
+      fullName: "PRIYA SHAH",
+      location: "London, England, United Kingdom",
+      website: "https://priya.shah.dev/",
+    });
+    expect(result.document.personal.jobTitle).toBeUndefined();
+    expect(result.document.sections.map((section) => section.type)).toEqual(["summary", "skills", "projects", "certificates", "custom"]);
+    expect(result.unclassifiedText).toEqual(["Mentors early-career engineers every month."]);
+    expect(result.warnings).toHaveLength(1);
+
+    const project = result.document.sections.find((section) => section.type === "projects");
+    expect(project).toMatchObject({
+      type: "projects",
+      entries: [{ title: "Release Console", subtitle: "Technical Lead", dateRange: { start: { month: 3, year: 2023 }, end: { month: 12, year: 2023 }, current: false } }],
     });
   });
 });
