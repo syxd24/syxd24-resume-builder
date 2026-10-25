@@ -7,11 +7,23 @@ import styles from "./resume-renderer.module.css";
 
 type RichTextBlock = RichText[number];
 
+function renderText(text: string, keyPrefix: string): ReactNode {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  if (lines.length === 1) return text;
+
+  return lines.map((line, lineIndex) => (
+    <Fragment key={`${keyPrefix}-${lineIndex}`}>
+      {line}
+      {lineIndex < lines.length - 1 ? <br /> : null}
+    </Fragment>
+  ));
+}
+
 function renderSpan(block: RichTextBlock, blockIndex: number): ReactNode {
-  if (!block.spans?.length) return block.text;
+  if (!block.spans?.length) return renderText(block.text, `${blockIndex}-text`);
 
   return block.spans.map((span, spanIndex) => {
-    let content: ReactNode = span.text;
+    let content: ReactNode = renderText(span.text, `${blockIndex}-${spanIndex}-text`);
     if (span.marks.includes("underline")) content = <u>{content}</u>;
     if (span.marks.includes("italic")) content = <em>{content}</em>;
     if (span.marks.includes("bold")) content = <strong>{content}</strong>;
@@ -30,6 +42,8 @@ function renderSpan(block: RichTextBlock, blockIndex: number): ReactNode {
 }
 
 export function RichTextContent({ value }: { value: RichText }) {
+  if (!value.length) return null;
+
   const rendered: ReactNode[] = [];
   let index = 0;
 

@@ -1,6 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import type { ResumeRecord } from "@/data/resumes";
@@ -12,6 +21,17 @@ import styles from "./resume-editor.module.css";
 import { useResumeAutosave } from "./useResumeAutosave";
 
 type Mode = "content" | "customize";
+type MobilePane = "edit" | "preview";
+type PreviewZoomMode = "fit-width" | "fit-page" | "actual" | "custom";
+
+const MIN_EDITOR_PERCENT = 36;
+const MAX_EDITOR_PERCENT = 58;
+const MIN_PREVIEW_SCALE = 0.35;
+const MAX_PREVIEW_SCALE = 1.6;
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
 
 async function responseError(response: Response, fallback: string): Promise<Error> {
   const payload = await response.json().catch(() => ({})) as { error?: string };
@@ -29,10 +49,20 @@ export function ResumeEditor({
 }) {
   const router = useRouter();
   const uploadRef = useRef<HTMLInputElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const previewWorkspaceRef = useRef<HTMLElement>(null);
+  const previewToolbarRef = useRef<HTMLDivElement>(null);
+  const previewSurfaceRef = useRef<HTMLDivElement>(null);
+  const previewScaleRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState(initialResume.title);
   const [document, setDocument] = useState(initialResume.content);
   const [design, setDesign] = useState(initialResume.design);
   const [mode, setMode] = useState<Mode>("content");
+  const [mobilePane, setMobilePane] = useState<MobilePane>("edit");
+  const [editorPercent, setEditorPercent] = useState(45);
+  const [resizing, setResizing] = useState(false);
+  const [previewZoomMode, setPreviewZoomMode] = useState<PreviewZoomMode>("fit-width");
+  const [previewScale, setPreviewScale] = useState(0.9);
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const [actionError, setActionError] = useState<string>();
   const [downloading, setDownloading] = useState(false);
@@ -40,6 +70,92 @@ export function ResumeEditor({
   const snapshot = useMemo(() => ({ title, content: document, design }), [title, document, design]);
   const autosave = useResumeAutosave({ resumeId: initialResume.id, initialVersion: initialResume.lockVersion, snapshot, disabled: previewMode });
   const assetUrls = document.personal.photo?.storagePath && photoUrl ? { [document.personal.photo.storagePath]: photoUrl } : undefined;
+
+  const updateFittedPreviewScale = useCallback(() => {
+    if (previewZoomMode !== "fit-width" && previewZoomMode !== "fit-page") return;
+
+    const viewport = previewWorkspaceRef.current;
+    const surface = previewSurfaceRef.current;
+    const scaleTarget = previewScaleRef.current;
+    const firstPage = scaleTarget?.querySelector<HTMLElement>("[data-resume-page]");
+    if (!viewport || !surface || !firstPage || viewport.clientWidth === 0) return;
+
+    const surfaceStyles = window.getComputedStyle(surface);
+    const horizontalPadding = Number.parseFloat(surfaceStyles.paddingLeft) + Number.parseFloat(surfaceStyles.paddingRight);
+    const verticalPadding = Number.parseFloat(surfaceStyles.paddingTop) + Number.parseFloat(surfaceStyles.paddingBottom);
+    const availableWidth = Math.max(1, viewport.clientWidth - horizontalPadding);
+    const widthScale = availableWidth / firstPage.offsetWidth;
+
+    if (previewZoomMode === "fit-width") {
+      setPreviewScale(clamp(widthScale, MIN_PREVIEW_SCALE, MAX_PREVIEW_SCALE));
+      return;
+    }
+
+    const toolbarHeight = previewToolbarRef.current?.offsetHeight ?? 0;
+    const availableHeight = Math.max(1, viewport.clientHeight - toolbarHeight - verticalPadding);
+    const heightScale = availableHeight / firstPage.offsetHeight;
+    setPreviewScale(clamp(Math.min(widthScale, heightScale), MIN_PREVIEW_SCALE, MAX_PREVIEW_SCALE));
+  }, [previewZoomMode]);
+
+  useLayoutEffect(() => {
+    updateFittedPreviewScale();
+    const viewport = previewWorkspaceRef.current;
+    if (!viewport) return;
+
+    const handleResize = () => updateFittedPreviewScale();
+    window.addEventListener("resize", handleResize);
+    if (typeof ResizeObserver === "undefined") {
+      return () => window.removeEventListener("resize", handleResize);
+    }
+
+    const observer = new ResizeObserver(handleResize);
+    observer.observe(viewport);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [design.document.pageFormat, editorPercent, mobilePane, updateFittedPreviewScale]);
+
+  const selectZoomMode = (nextMode: Exclude<PreviewZoomMode, "custom">) => {
+    setPreviewZoomMode(nextMode);
+    if (nextMode === "actual") setPreviewScale(1);
+  };
+
+  const stepPreviewZoom = (direction: -1 | 1) => {
+    setPreviewZoomMode("custom");
+    setPreviewScale((current) => clamp(Math.round((current + direction * 0.1) * 100) / 100, MIN_PREVIEW_SCALE, MAX_PREVIEW_SCALE));
+  };
+
+  const resizePanels = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.type === "pointermove" && !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    const bounds = workspace.getBoundingClientRect();
+    const nextPercent = ((event.clientX - bounds.left) / bounds.width) * 100;
+    setEditorPercent(clamp(nextPercent, MIN_EDITOR_PERCENT, MAX_EDITOR_PERCENT));
+  };
+
+  const beginPanelResize = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizing(true);
+    resizePanels(event);
+  };
+
+  const endPanelResize = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setResizing(false);
+  };
+
+  const resizePanelsWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const direction = event.key === "ArrowLeft" ? -1 : 1;
+    const step = event.shiftKey ? 4 : 1;
+    setEditorPercent((current) => clamp(current + direction * step, MIN_EDITOR_PERCENT, MAX_EDITOR_PERCENT));
+  };
 
   const goBack = async () => {
     if (previewMode) {
@@ -141,16 +257,20 @@ export function ResumeEditor({
     <div className={styles.editor}>
       <header className={styles.toolbar}>
         <div className={styles.toolbarStart}>
-          <button type="button" className={styles.backButton} onClick={() => void goBack()} aria-label="Back to My Resumes">←</button>
+          <button type="button" className={styles.backButton} onClick={() => void goBack()} aria-label="Back to My Resumes">
+            <span aria-hidden="true">&#8592;</span>
+            <span>Overview</span>
+          </button>
           <div className={styles.modeTabs} role="tablist" aria-label="Editor mode">
-            <button type="button" role="tab" aria-selected={mode === "content"} onClick={() => setMode("content")}>Content</button>
-            <button type="button" role="tab" aria-selected={mode === "customize"} onClick={() => setMode("customize")}>Customize</button>
+            <button type="button" role="tab" aria-selected={mode === "content"} onClick={() => { setMode("content"); setMobilePane("edit"); }}>Content</button>
+            <button type="button" role="tab" aria-selected={mode === "customize"} onClick={() => { setMode("customize"); setMobilePane("edit"); }}>Customize</button>
           </div>
         </div>
         <div className={styles.toolbarCenter}>
           <label htmlFor="resume-title">Resume title</label>
           <input id="resume-title" value={title} maxLength={300} onChange={(event) => setTitle(event.target.value)} />
           <div className={styles.saveState} data-state={autosave.status} role="status">
+            <span className={styles.saveDot} aria-hidden="true" />
             {previewMode ? "Preview mode" : autosave.status === "saving" ? "Saving…" : autosave.status === "error" ? "Save failed" : "Saved"}
             {autosave.status === "error" ? <button type="button" onClick={() => void autosave.retry().catch(() => undefined)}>Retry</button> : null}
           </div>
@@ -158,7 +278,7 @@ export function ResumeEditor({
         <div className={styles.toolbarActions}>
           <button type="button" className={styles.downloadButton} disabled={downloading} onClick={() => void download()}>{previewMode ? "Print preview" : downloading ? "Generating…" : "Download PDF"}</button>
           {!previewMode ? <div className={styles.menuWrap}>
-            <button type="button" className={styles.menuButton} aria-label="Resume actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>•••</button>
+            <button type="button" className={styles.menuButton} aria-label="Resume actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>&#8230;</button>
             {menuOpen ? <div className={styles.menu} role="menu">
               <button type="button" role="menuitem" onClick={() => runAction(duplicate)}>Duplicate</button>
               <button type="button" role="menuitem" className={styles.danger} onClick={() => runAction(remove)}>Delete</button>
@@ -169,7 +289,18 @@ export function ResumeEditor({
 
       {autosave.error || actionError ? <div className={styles.errorBanner} role="alert">{actionError || autosave.error}</div> : null}
 
-      <div className={styles.workspace} data-mode={mode}>
+      <div
+        ref={workspaceRef}
+        className={styles.workspace}
+        data-mode={mode}
+        data-mobile-pane={mobilePane}
+        data-resizing={resizing ? "true" : "false"}
+        style={{ "--editor-pane-width": `${editorPercent}%` } as CSSProperties}
+      >
+        <div className={styles.mobilePaneTabs} role="tablist" aria-label="Mobile workspace view">
+          <button type="button" role="tab" aria-selected={mobilePane === "edit"} onClick={() => setMobilePane("edit")}>Edit</button>
+          <button type="button" role="tab" aria-selected={mobilePane === "preview"} onClick={() => setMobilePane("preview")}>Preview</button>
+        </div>
         <section className={styles.controls} aria-label={`${mode} controls`}>
           {mode === "content" ? (
             <ContentEditor
@@ -193,9 +324,58 @@ export function ResumeEditor({
           )}
           <input ref={uploadRef} className={styles.hiddenInput} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadPhoto(file).catch((cause) => setActionError(cause instanceof Error ? cause.message : "Photo upload failed.")); event.currentTarget.value = ""; }} />
         </section>
-        <section className={styles.previewWorkspace} aria-label="Live resume preview">
-          <div className={styles.previewScale} data-preview-scale="true" data-page-format={design.document.pageFormat}>
-            <ResumeRenderer document={document} design={design} pageFormat={design.document.pageFormat} mode="editor" assetUrls={assetUrls} />
+        <button
+          type="button"
+          className={styles.panelDivider}
+          role="separator"
+          aria-label="Resize editor and preview panels"
+          aria-orientation="vertical"
+          aria-valuemin={MIN_EDITOR_PERCENT}
+          aria-valuemax={MAX_EDITOR_PERCENT}
+          aria-valuenow={Math.round(editorPercent)}
+          title="Drag to resize panels. Double-click to reset."
+          onDoubleClick={() => setEditorPercent(45)}
+          onKeyDown={resizePanelsWithKeyboard}
+          onPointerDown={beginPanelResize}
+          onPointerMove={resizePanels}
+          onPointerUp={endPanelResize}
+          onPointerCancel={endPanelResize}
+        >
+          <span aria-hidden="true" />
+        </button>
+        <section
+          ref={previewWorkspaceRef}
+          className={styles.previewWorkspace}
+          data-preview-workspace="true"
+          data-zoom-mode={previewZoomMode}
+          aria-label="Live resume preview"
+        >
+          <div ref={previewToolbarRef} className={styles.previewToolbar} aria-label="Preview zoom controls">
+            <div className={styles.previewToolbarLabel}>
+              <span>Preview</span>
+              <span className={styles.previewZoomValue} aria-live="polite">{Math.round(previewScale * 100)}%</span>
+            </div>
+            <div className={styles.zoomControls}>
+              <button type="button" aria-pressed={previewZoomMode === "fit-width"} onClick={() => selectZoomMode("fit-width")}>Fit width</button>
+              <button type="button" aria-pressed={previewZoomMode === "fit-page"} onClick={() => selectZoomMode("fit-page")}>Fit page</button>
+              <button type="button" aria-pressed={previewZoomMode === "actual"} onClick={() => selectZoomMode("actual")}>100%</button>
+              <span className={styles.zoomStepper}>
+                <button type="button" aria-label="Zoom out" disabled={previewScale <= MIN_PREVIEW_SCALE} onClick={() => stepPreviewZoom(-1)}>&minus;</button>
+                <button type="button" aria-label="Zoom in" disabled={previewScale >= MAX_PREVIEW_SCALE} onClick={() => stepPreviewZoom(1)}>+</button>
+              </span>
+            </div>
+          </div>
+          <div ref={previewSurfaceRef} className={styles.previewSurface} data-preview-viewport="true">
+            <div
+              ref={previewScaleRef}
+              className={styles.previewScale}
+              data-preview-scale="true"
+              data-page-format={design.document.pageFormat}
+              data-zoom-mode={previewZoomMode}
+              style={{ "--preview-scale": previewScale } as CSSProperties}
+            >
+              <ResumeRenderer document={document} design={design} pageFormat={design.document.pageFormat} mode="editor" assetUrls={assetUrls} />
+            </div>
           </div>
         </section>
       </div>

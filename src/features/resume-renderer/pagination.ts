@@ -16,6 +16,17 @@ function lineHeightMm(design: ResumeDesign): number {
   return design.typography.baseSizePt * 0.3528 * design.typography.lineHeight;
 }
 
+function blockText(block: RichText[number]): string {
+  return block.spans?.map((span) => span.text).join("") ?? block.text;
+}
+
+function wrappedLineCount(text: string, chars: number): number {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / chars)), 0);
+}
+
 function charsPerLine(section: ResumeSection, design: ResumeDesign): number {
   const base = Math.max(32, Math.floor(1150 / design.typography.baseSizePt));
   if (design.layout.mode === "one-column" || section.column === "full") return base;
@@ -30,21 +41,23 @@ function richTextHeight(value: RichText, chars: number, design: ResumeDesign): n
   while (index < value.length) {
     const block = value[index]!;
     if (block.type === "paragraph") {
-      const length = block.spans?.reduce((sum, span) => sum + span.text.length, 0) ?? block.text.length;
-      height += Math.max(1, Math.ceil(length / chars)) * line;
+      height += wrappedLineCount(blockText(block), chars) * line;
       if (index < value.length - 1) height += design.spacing.paragraphGapMm;
       index += 1;
       continue;
     }
 
     const listType = block.type;
+    const listChars = Math.max(8, chars - 4);
+    let itemCount = 0;
     while (index < value.length && value[index]!.type === listType) {
       const item = value[index]!;
-      const length = item.spans?.reduce((sum, span) => sum + span.text.length, 0) ?? item.text.length;
-      height += Math.max(1, Math.ceil(length / chars)) * line;
+      if (itemCount) height += 0.2;
+      height += wrappedLineCount(blockText(item), listChars) * line;
+      itemCount += 1;
       index += 1;
     }
-    height += design.spacing.paragraphGapMm;
+    if (index < value.length) height += design.spacing.paragraphGapMm;
   }
   return height;
 }

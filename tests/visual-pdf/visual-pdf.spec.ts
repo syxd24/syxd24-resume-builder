@@ -207,6 +207,75 @@ test("content editor visual with expanded experience", async ({ page }) => {
   await expect(page).toHaveScreenshot("content-expanded-experience-1440x900.png", { animations: "disabled" });
 });
 
+test("unified experience editor replaces paragraph blocks and keeps Done reachable", async ({ page }) => {
+  await openFixtureEditor(page);
+  await page.getByRole("button", { name: /^PROFESSIONAL EXPERIENCE$/i }).click();
+  await page.getByRole("button", { name: "Junior Software Developer Visible", exact: true }).click();
+
+  const controls = page.getByRole("region", { name: "content controls" });
+  const editor = controls.getByRole("textbox", { name: "Description" });
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAttribute("contenteditable", "true");
+  await expect(controls.getByRole("button", { name: "Bold selected text" })).toBeVisible();
+  await expect(controls.getByRole("button", { name: "Toggle unordered list" })).toBeVisible();
+  await expect(controls.getByRole("button", { name: "Insert or edit hyperlink" })).toBeVisible();
+  await expect(controls.getByText("Add paragraph", { exact: true })).toHaveCount(0);
+  await expect(controls.getByText("Remove block", { exact: true })).toHaveCount(0);
+
+  const done = controls.getByRole("button", { name: "Done", exact: true });
+  await done.scrollIntoViewIfNeeded();
+  await expect(done).toBeVisible();
+  const [controlsBox, doneBox] = await Promise.all([controls.boundingBox(), done.boundingBox()]);
+  expect(controlsBox).not.toBeNull();
+  expect(doneBox).not.toBeNull();
+  expect(doneBox!.y + doneBox!.height).toBeLessThanOrEqual(controlsBox!.y + controlsBox!.height + 1);
+});
+
+test("desktop workspace fills 1366x768 and preview zoom remains independent", async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await openFixtureEditor(page);
+
+  const controls = page.getByRole("region", { name: "content controls" });
+  const preview = page.getByRole("region", { name: "Live resume preview" });
+  const pageSheet = preview.locator("[data-resume-page]").first();
+  const fitWidth = page.getByRole("button", { name: "Fit width", exact: true });
+  await expect(fitWidth).toHaveAttribute("aria-pressed", "true");
+
+  const geometry = await page.evaluate(() => ({
+    documentHeight: document.documentElement.scrollHeight,
+    viewportHeight: document.documentElement.clientHeight,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(geometry.documentHeight).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+  expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+
+  const [controlsBox, previewBox, fitPageBox] = await Promise.all([
+    controls.boundingBox(),
+    preview.boundingBox(),
+    pageSheet.boundingBox(),
+  ]);
+  expect(controlsBox).not.toBeNull();
+  expect(previewBox).not.toBeNull();
+  expect(fitPageBox).not.toBeNull();
+  expect(controlsBox!.width / 1366).toBeGreaterThan(0.4);
+  expect(controlsBox!.width / 1366).toBeLessThan(0.49);
+  expect(fitPageBox!.width).toBeGreaterThan(previewBox!.width * 0.82);
+  expect(fitPageBox!.width).toBeLessThanOrEqual(previewBox!.width);
+
+  await page.getByRole("button", { name: "100%", exact: true }).click();
+  await expect(page.getByRole("button", { name: "100%", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const actualSize = await pageSheet.boundingBox();
+  expect(actualSize).not.toBeNull();
+  expect(actualSize!.width).toBeGreaterThan(790);
+
+  await page.getByRole("button", { name: "Fit page", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Fit page", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const fittedSize = await pageSheet.boundingBox();
+  expect(fittedSize).not.toBeNull();
+  expect(fittedSize!.height).toBeLessThan(previewBox!.height);
+});
+
 test("editor adapts without document overflow at tablet and mobile widths", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openFixtureEditor(page);

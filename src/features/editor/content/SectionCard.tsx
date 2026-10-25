@@ -175,7 +175,19 @@ function EntryCard({
       <div className={styles.collapse} data-expanded={expanded}>
         <div className={styles.collapseInner} aria-hidden={!expanded} inert={!expanded}>
           <div ref={bodyRef} id={`entry-${entry.id}`} className={styles.entryBody}>
+            <div className={styles.entryEditHeading}>
+              <div>
+                <h3>Edit entry</h3>
+                <p>Changes update your resume preview automatically.</p>
+              </div>
+            </div>
             <EntryEditor sectionType={section.type} entry={entry} onChange={changeEntry} />
+            <footer className={styles.doneFooter}>
+              <button type="button" className={styles.doneButton} onClick={onToggle}>
+                <span aria-hidden="true">&#10003;</span>
+                Done
+              </button>
+            </footer>
           </div>
         </div>
       </div>

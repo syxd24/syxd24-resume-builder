@@ -203,12 +203,34 @@
 .entryHeader[data-metadata-align="left"] .entryMetadata { max-width: none; text-align: left; }
 .entryDescription { margin-top: .65mm; margin-left: var(--resume-description-indent); }
 
-.richText p { margin: 0 0 var(--resume-paragraph-gap); }
+.richText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.richText p {
+  margin: 0 0 var(--resume-paragraph-gap);
+  orphans: 2;
+  widows: 2;
+}
 .richText p:last-child { margin-bottom: 0; }
 .richText ul,
-.richText ol { margin: 0 0 var(--resume-paragraph-gap); padding-left: 3.8mm; }
-.richText li { padding-left: .45mm; break-inside: avoid; }
+.richText ol {
+  margin: 0 0 var(--resume-paragraph-gap);
+  padding-inline-start: 4.2mm;
+  list-style-position: outside;
+}
+.richText ul:last-child,
+.richText ol:last-child { margin-bottom: 0; }
+.richText li {
+  padding-inline-start: .55mm;
+  break-inside: avoid;
+  orphans: 2;
+  widows: 2;
+}
 .richText li + li { margin-top: .2mm; }
+.richText li::marker { color: var(--resume-body-color); font-weight: 600; }
+.richText p,
+.richText li { white-space: pre-wrap; }
 .richText a,
 .entry a,
 .footer a { color: var(--resume-link-color); text-decoration: none; }

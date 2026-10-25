@@ -5,6 +5,7 @@ import fixtureDesign from "../../fixtures/default-design.json";
 import fixtureDocument from "../../fixtures/golden-resume.json";
 import { resumeDesignSchema, resumeDocumentSchema, type ResumeDocument } from "@/domain/resume";
 import { ResumeRenderer } from "@/features/resume-renderer/ResumeRenderer";
+import { RichTextContent } from "@/features/resume-renderer/RichText";
 import { fontStack, formatDateRange, PAGE_DIMENSIONS } from "@/features/resume-renderer/format";
 import { paginateResume } from "@/features/resume-renderer/pagination";
 
@@ -39,6 +40,61 @@ describe("ResumeRenderer", () => {
     expect(container.querySelector('[data-resume-page="1"]')).toBeTruthy();
     expect(container.querySelectorAll("[data-resume-page]")).toHaveLength(1);
     expect(screen.getAllByText("LANGUAGES")).toHaveLength(1);
+  });
+
+  it("renders unified rich text as semantic paragraphs and grouped lists", () => {
+    const { container } = render(
+      <RichTextContent
+        value={[
+          { type: "paragraph", text: "Intro" },
+          { type: "bullet", text: "First bullet" },
+          { type: "bullet", text: "Second bullet" },
+          { type: "ordered-item", text: "First numbered item" },
+          { type: "ordered-item", text: "Second numbered item" },
+          { type: "paragraph", text: "Closing" },
+        ]}
+      />,
+    );
+
+    expect(container.querySelectorAll("p")).toHaveLength(2);
+    expect(container.querySelectorAll("ul")).toHaveLength(1);
+    expect(container.querySelectorAll("ul > li")).toHaveLength(2);
+    expect(container.querySelectorAll("ol")).toHaveLength(1);
+    expect(container.querySelectorAll("ol > li")).toHaveLength(2);
+  });
+
+  it("preserves marks, safe links, and explicit line breaks without interpreting text as HTML", () => {
+    const { container } = render(
+      <RichTextContent
+        value={[
+          {
+            type: "bullet",
+            text: "",
+            spans: [
+              { text: "Bold\nline", marks: ["bold", "underline"], href: "https://example.com/profile" },
+              { text: " <script>alert(1)</script>", marks: ["italic"] },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const link = container.querySelector('a[data-resume-link="rich-text"]');
+    expect(link?.getAttribute("href")).toBe("https://example.com/profile");
+    expect(link?.querySelector("strong u")).toBeTruthy();
+    expect(link?.querySelector("br")).toBeTruthy();
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.textContent).toContain("<script>alert(1)</script>");
+  });
+
+  it("does not create anchors for unsafe rich-text link protocols", () => {
+    const unsafeValue = [
+      { type: "paragraph" as const, text: "Unsafe", spans: [{ text: "Unsafe", marks: [], href: "javascript:alert(1)" }] },
+    ];
+    const { container } = render(<RichTextContent value={unsafeValue} />);
+
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.textContent).toContain("Unsafe");
   });
 
   it("uses distinct, print-safe icons for standard contacts and recognized links", () => {
