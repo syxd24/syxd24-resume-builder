@@ -5,6 +5,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -65,11 +66,47 @@ export function ResumeEditor({
   const [previewScale, setPreviewScale] = useState(0.9);
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const [actionError, setActionError] = useState<string>();
+  const [externalChangeWarning, setExternalChangeWarning] = useState<string>();
   const [downloading, setDownloading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const snapshot = useMemo(() => ({ title, content: document, design }), [title, document, design]);
   const autosave = useResumeAutosave({ resumeId: initialResume.id, initialVersion: initialResume.lockVersion, snapshot, disabled: previewMode });
   const assetUrls = document.personal.photo?.storagePath && photoUrl ? { [document.personal.photo.storagePath]: photoUrl } : undefined;
+
+  // ChatGPT may update a saved CV in Supabase while this editor tab is inactive.
+  // Reload only clean local state; never discard pending edits or an in-flight save.
+  useEffect(() => {
+    if (previewMode) return;
+    let checking = false;
+    let disposed = false;
+    const checkExternalUpdates = async () => {
+      if (checking || document.visibilityState === "hidden") return;
+      checking = true;
+      try {
+        const response = await fetch(`/api/resumes/${initialResume.id}`, { cache: "no-store" });
+        if (!response.ok || disposed) return;
+        const payload = await response.json() as { resume?: Pick<ResumeRecord, "lockVersion"> };
+        if (!payload.resume || payload.resume.lockVersion <= autosave.versionRef.current || disposed) return;
+        if (autosave.hasPendingChanges()) {
+          setExternalChangeWarning("A newer CV is saved in another tab or ChatGPT. Your local edits were not replaced. Copy them before refreshing.");
+        } else {
+          window.location.reload();
+        }
+      } catch {
+        // A transient network failure must not interfere with editing.
+      } finally {
+        checking = false;
+      }
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") void checkExternalUpdates(); };
+    window.addEventListener("focus", checkExternalUpdates);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", checkExternalUpdates);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [initialResume.id, previewMode, autosave.hasPendingChanges, autosave.versionRef]);
 
   const updateFittedPreviewScale = useCallback(() => {
     if (previewZoomMode !== "fit-width" && previewZoomMode !== "fit-page") return;
@@ -222,6 +259,22 @@ export function ResumeEditor({
     router.push(`/resumes/${payload.resume.id}`);
   };
 
+  const duplicateForJob = async () => {
+    const responseTitle = window.prompt("Company and job title for the new CV:", `${title} — Job application`);
+    if (responseTitle === null) return;
+    const newTitle = responseTitle.trim();
+    if (!newTitle || newTitle.length > 300) throw new Error("Enter a CV title between 1 and 300 characters.");
+    if (!(await autosave.flush())) throw new Error("Save or resolve your pending changes before duplicating.");
+    const response = await fetch(`/api/resumes/${initialResume.id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle, expectedVersion: autosave.versionRef.current }),
+    });
+    if (!response.ok) throw await responseError(response, "Could not create a job-specific copy.");
+    const payload = await response.json() as { resume: ResumeRecord };
+    router.push(`/resumes/${payload.resume.id}`);
+  };
+
   const remove = async () => {
     if (!window.confirm(`Delete “${title || "Untitled Resume"}” permanently?`)) return;
     const response = await fetch(`/api/resumes/${initialResume.id}`, { method: "DELETE" });
@@ -280,6 +333,7 @@ export function ResumeEditor({
           {!previewMode ? <div className={styles.menuWrap}>
             <button type="button" className={styles.menuButton} aria-label="Resume actions" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>&#8230;</button>
             {menuOpen ? <div className={styles.menu} role="menu">
+              <button type="button" role="menuitem" onClick={() => runAction(duplicateForJob)}>Create job-specific copy</button>
               <button type="button" role="menuitem" onClick={() => runAction(duplicate)}>Duplicate</button>
               <button type="button" role="menuitem" className={styles.danger} onClick={() => runAction(remove)}>Delete</button>
             </div> : null}
@@ -287,7 +341,7 @@ export function ResumeEditor({
         </div>
       </header>
 
-      {autosave.error || actionError ? <div className={styles.errorBanner} role="alert">{actionError || autosave.error}</div> : null}
+      {autosave.error || actionError || externalChangeWarning ? <div className={styles.errorBanner} role="alert">{actionError || autosave.error || externalChangeWarning}</div> : null}
 
       <div
         ref={workspaceRef}

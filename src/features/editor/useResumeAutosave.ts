@@ -29,9 +29,16 @@ export function useResumeAutosave(options: {
   const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inFlightRef = useRef<Promise<boolean> | undefined>(undefined);
+  const conflictRef = useRef(false);
+  const hasPendingChanges = useCallback(() => dirtyRef.current || Boolean(inFlightRef.current), []);
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (disabled) return true;
+    if (conflictRef.current) {
+      setStatus("error");
+      setError("This resume was changed elsewhere. Copy your unsaved edits before reloading; Retry cannot overwrite newer data.");
+      return false;
+    }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = undefined;
     while (true) {
@@ -59,7 +66,7 @@ export function useResumeAutosave(options: {
         });
         const payload = await response.json().catch(() => ({})) as { resume?: ResumeRecord; current?: ResumeRecord; error?: string };
         if (!response.ok) {
-          if (response.status === 409 && payload.current) versionRef.current = payload.current.lockVersion;
+          if (response.status === 409) conflictRef.current = true;
           throw new Error(payload.error || "Save failed. Your local edits are still here.");
         }
         if (!payload.resume) throw new Error("The save response was incomplete.");
@@ -94,6 +101,10 @@ export function useResumeAutosave(options: {
     }
     if (nextHash === savedHashRef.current) return;
     dirtyRef.current = true;
+    if (conflictRef.current) {
+      setStatus("error");
+      return;
+    }
     setStatus("saving");
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => void flush().catch(() => undefined), delayMs);
@@ -113,5 +124,5 @@ export function useResumeAutosave(options: {
     return () => window.removeEventListener("beforeunload", warn);
   }, [disabled]);
 
-  return { status, error, flush, retry: flush, versionRef };
+  return { status, error, flush, retry: flush, versionRef, hasPendingChanges };
 }
