@@ -274,7 +274,7 @@ export const customEntrySchema = z
 export const summarySectionSchema = z.object({ ...sectionBase, type: z.literal("summary"), content: richTextSchema.default([]) }).strict();
 export const experienceSectionSchema = z.object({ ...sectionBase, type: z.literal("experience"), entries: z.array(experienceEntrySchema).default([]) }).strict();
 export const educationSectionSchema = z.object({ ...sectionBase, type: z.literal("education"), entries: z.array(educationEntrySchema).default([]) }).strict();
-export const skillsSectionSchema = z.object({ ...sectionBase, type: z.literal("skills"), entries: z.array(skillEntrySchema).default([]) }).strict();
+export const skillsSectionSchema = z.object({ ...sectionBase, type: z.literal("skills"), entries: z.array(skillEntrySchema).default([]), content: richTextSchema.optional() }).strict();
 export const languagesSectionSchema = z.object({ ...sectionBase, type: z.literal("languages"), entries: z.array(languageEntrySchema).default([]) }).strict();
 export const certificatesSectionSchema = z.object({ ...sectionBase, type: z.literal("certificates"), entries: z.array(certificateEntrySchema).default([]) }).strict();
 export const interestsSectionSchema = z.object({ ...sectionBase, type: z.literal("interests"), entries: z.array(interestEntrySchema).default([]) }).strict();
@@ -341,6 +341,46 @@ export type SectionType = z.infer<typeof sectionTypeSchema>;
 export type SectionColumn = z.infer<typeof sectionColumnSchema>;
 export type ResumeSection = z.infer<typeof resumeSectionSchema>;
 export type ResumeDocument = z.infer<typeof resumeDocumentSchema>;
+
+function legacySkillDescription(text: string): RichText {
+  return text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n").map((line) => {
+    const spans: RichText[number]["spans"] = [];
+    const markdown = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+    let cursor = 0;
+    const source = line.replace(/\\\s*$/, "");
+    for (const match of source.matchAll(markdown)) {
+      const index = match.index ?? 0;
+      if (index > cursor) spans.push({ text: source.slice(cursor, index), marks: [] });
+      const token = match[0];
+      const bold = token.startsWith("**") || token.startsWith("__");
+      spans.push({ text: token.slice(bold ? 2 : 1, bold ? -2 : -1), marks: [bold ? "bold" : "italic"] });
+      cursor = index + token.length;
+    }
+    if (cursor < source.length) spans.push({ text: source.slice(cursor), marks: [] });
+    return { type: "paragraph" as const, text: spans.map((span) => span.text).join(""), ...(spans.length ? { spans } : {}) };
+  });
+}
+
+/** Converts older entry-based Skills sections without discarding their stored entries. */
+export function legacySkillsToRichText(entries: z.infer<typeof skillEntrySchema>[]): RichText {
+  return entries.filter((entry) => entry.visible).flatMap((entry) => {
+    const prefix = [entry.name, entry.category].filter(Boolean);
+    const description = entry.description ? legacySkillDescription(entry.description) : [];
+    if (!prefix.length) return description;
+    const lead: RichText[number] = {
+      type: "paragraph",
+      text: `${prefix.join(": ")}${entry.description ? ": " : ""}`,
+      spans: [
+        { text: prefix[0]!, marks: ["bold"] },
+        ...(prefix.length > 1 ? [{ text: `: ${prefix.slice(1).join(": ")}`, marks: [] as ("bold" | "italic" | "underline")[] }] : []),
+        ...(entry.description ? [{ text: ": ", marks: [] as ("bold" | "italic" | "underline")[] }] : []),
+      ],
+    };
+    if (!description.length) return [lead];
+    const first = description[0]!;
+    return [{ ...lead, text: lead.text + first.text, spans: [...(lead.spans ?? []), ...(first.spans ?? [{ text: first.text, marks: [] }])] }, ...description.slice(1)];
+  });
+}
 
 export function createDefaultResumeDocument(): ResumeDocument {
   return resumeDocumentSchema.parse({

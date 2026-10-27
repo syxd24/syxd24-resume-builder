@@ -1,7 +1,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 
-import type { ResumeDesign, ResumeSection, SectionType } from "@/domain/resume";
+import { legacySkillsToRichText, type ResumeDesign, type ResumeSection, type SectionType } from "@/domain/resume";
 
 import { formatDateRange, formatResumeDate, joinMetadata, safeHref } from "./format";
 import { RichTextContent } from "./RichText";
@@ -128,30 +128,9 @@ function EducationSection({ section, design }: SectionRendererProps & { section:
 }
 
 function SkillsSection({ section, design }: SectionRendererProps & { section: Extract<ResumeSection, { type: "skills" }> }) {
-  const display = design.sections[section.id]?.skillDisplay ?? "text";
   return (
     <SectionShell section={section} design={design}>
-      <div className={styles.competencies} data-competency-kind="skills" data-skill-display={display}>
-        {section.entries.filter((entry) => entry.visible).map((entry) => {
-          const detail = [entry.category, entry.description].filter(Boolean).join(design.entries.metadataSeparator);
-          return (
-            <div className={styles.competency} data-has-detail={detail ? "true" : "false"} key={entry.id}>
-              <div className={styles.competencyText}>
-                <strong>{entry.name}</strong>
-                {detail ? <span>{detail}</span> : null}
-              </div>
-              {display === "level" && entry.level !== undefined ? (
-                <div className={styles.levelWrap} aria-label={`${entry.name}: ${entry.level}%`}>
-                  <span className={styles.levelTrack} aria-hidden="true">
-                    <span className={styles.levelFill} style={{ width: `${entry.level}%` }} />
-                  </span>
-                  <span className={styles.levelValue}>{entry.level}%</span>
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      <RichTextContent value={section.content ?? legacySkillsToRichText(section.entries)} />
     </SectionShell>
   );
 }

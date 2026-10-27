@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import type { ResumeDocument, ResumeSection } from "@/domain/resume/schema";
+import { legacySkillsToRichText } from "@/domain/resume/schema";
 import {
   appendEntry,
   copyEntry,
@@ -210,6 +211,7 @@ export function SectionCard({
   const entryCount = entrySection?.entries.length ?? 0;
   const status = useMemo(() => {
     if (!section.visible) return "Hidden from resume";
+    if (section.type === "skills") return "Rich text";
     if (entrySection) return `${entryCount} ${entryCount === 1 ? "entry" : "entries"}`;
     return section.type === "summary" ? "Profile text" : "Declaration text";
   }, [entryCount, entrySection, section.type, section.visible]);
@@ -317,7 +319,18 @@ export function SectionCard({
             </>
           ) : null}
 
-          {entrySection ? (
+          {section.type === "skills" ? (
+            <RichTextEditor
+              label="Skills"
+              value={section.content ?? legacySkillsToRichText(section.entries)}
+              onChange={(content) => onChange(
+                { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, content } : candidate) },
+                { reason: "section-update", sectionId: section.id },
+              )}
+            />
+          ) : null}
+
+          {entrySection && entrySection.type !== "skills" ? (
             <div className={styles.entries}>
               {entrySection.entries.map((entry, entryIndex) => (
                 <EntryCard

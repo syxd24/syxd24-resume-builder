@@ -232,9 +232,30 @@ export function plainTextToRichText(value: string): RichText {
     const bullet = line.match(BULLET_PREFIX);
     const ordered = line.match(ORDERED_PREFIX);
     const prefix = bullet?.[0] ?? ordered?.[0] ?? "";
+    const content = line.slice(prefix.length);
+    const spans: RichTextSpan[] = [];
+    const markdown = /(\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[([^\]]+)\]\(([^)\s]+)\))/g;
+    let cursor = 0;
+    for (const match of content.matchAll(markdown)) {
+      const index = match.index ?? 0;
+      if (index > cursor) appendSpan(spans, { text: content.slice(cursor, index), marks: [] });
+      const token = match[0];
+      const linkText = match[2];
+      const linkHref = match[3];
+      if (linkText !== undefined && linkHref !== undefined) {
+        spans.push({ text: linkText, marks: [], ...(safeRichTextHref(linkHref) ? { href: safeRichTextHref(linkHref) } : {}) });
+      } else {
+        const isBold = token.startsWith("**") || token.startsWith("__");
+        const text = token.slice(isBold ? 2 : 1, isBold ? -2 : -1);
+        appendSpan(spans, { text, marks: [isBold ? "bold" : "italic"] });
+      }
+      cursor = index + token.length;
+    }
+    if (cursor < content.length) appendSpan(spans, { text: content.slice(cursor), marks: [] });
     return {
       type: bullet ? "bullet" as const : ordered ? "ordered-item" as const : "paragraph" as const,
-      text: line.slice(prefix.length),
+      text: spans.length ? spans.map((span) => span.text).join("") : content,
+      ...(spans.some((span) => span.marks.length || span.href) ? { spans } : {}),
     };
   });
 }

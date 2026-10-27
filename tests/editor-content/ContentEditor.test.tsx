@@ -104,4 +104,34 @@ describe("ContentEditor", () => {
     expect(summaryToggle).toHaveAttribute("aria-expanded", "true");
     expect(summaryBody?.textContent).toContain("Profile summary");
   });
+
+  it("edits all Skills in one rich-text box and retains legacy skill entries on conversion", () => {
+    const changed = vi.fn();
+    function LegacySkillsEditor() {
+      const [document, setDocument] = useState(() => {
+        const initial = createDefaultResumeDocument();
+        const skills = initial.sections.find((section) => section.type === "skills");
+        if (skills?.type === "skills") skills.entries = [{ id: "legacy-skill", visible: true, name: "Apollo", category: "Sales tools", description: "Prospecting" }];
+        return initial;
+      });
+      return <ContentEditor document={document} onChange={(next) => { setDocument(next); changed(next); }} />;
+    }
+    render(<LegacySkillsEditor />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Skills.*Rich text/ }));
+    const editor = screen.getByRole("textbox", { name: "Skills" });
+    expect(editor).toHaveAttribute("contenteditable", "true");
+    expect(editor).toHaveTextContent("Apollo: Sales tools: Prospecting");
+    expect(screen.queryByLabelText("Skill")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Category")).not.toBeInTheDocument();
+
+    fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === "text/plain" ? "**Sales:** Apollo, Clay" : "" } });
+    const next = changed.mock.lastCall?.[0] as ResumeDocument;
+    const skills = next.sections.find((section) => section.type === "skills");
+    expect(skills).toMatchObject({ type: "skills", entries: [{ id: "legacy-skill", name: "Apollo" }] });
+    expect(skills?.type === "skills" && skills.content?.[0]).toMatchObject({ text: "Sales: Apollo, Clay", spans: [
+      { text: "Sales:", marks: ["bold"] }, { text: " Apollo, Clay", marks: [] },
+    ] });
+    expect(resumeDocumentSchema.parse(next)).toEqual(next);
+  });
 });

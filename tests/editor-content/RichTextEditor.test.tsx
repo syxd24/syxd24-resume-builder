@@ -52,6 +52,20 @@ describe("rich-text codec", () => {
     ]);
   });
 
+  it("parses Markdown emphasis, links, lists, and line breaks from plain-text paste", () => {
+    const pasted = clipboardToRichText("", "**B2B Sales:** Account Management\n*Pipeline Strategy* and [Apollo](https://example.com)\n- Lead generation");
+
+    expect(pasted).toEqual([
+      { type: "paragraph", text: "B2B Sales: Account Management", spans: [
+        { text: "B2B Sales:", marks: ["bold"] }, { text: " Account Management", marks: [] },
+      ] },
+      { type: "paragraph", text: "Pipeline Strategy and Apollo", spans: [
+        { text: "Pipeline Strategy", marks: ["italic"] }, { text: " and ", marks: [] }, { text: "Apollo", marks: [], href: "https://example.com" },
+      ] },
+      { type: "bullet", text: "Lead generation" },
+    ]);
+  });
+
   it("keeps reasonable Word-style formatting while discarding unsafe link protocols", () => {
     const pasted = clipboardToRichText(
       '<p class="MsoListParagraph">&#8226; <span style="font-weight: 700">Led sales</span> with <a href="javascript:alert(1)">unsafe</a></p>',
