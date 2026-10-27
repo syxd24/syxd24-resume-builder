@@ -71,6 +71,7 @@ export function ResumeEditor({
   const [menuOpen, setMenuOpen] = useState(false);
   const snapshot = useMemo(() => ({ title, content: document, design }), [title, document, design]);
   const autosave = useResumeAutosave({ resumeId: initialResume.id, initialVersion: initialResume.lockVersion, snapshot, disabled: previewMode });
+  const { versionRef, hasPendingChanges } = autosave;
   const assetUrls = document.personal.photo?.storagePath && photoUrl ? { [document.personal.photo.storagePath]: photoUrl } : undefined;
 
   // ChatGPT may update a saved CV in Supabase while this editor tab is inactive.
@@ -86,8 +87,8 @@ export function ResumeEditor({
         const response = await fetch(`/api/resumes/${initialResume.id}`, { cache: "no-store" });
         if (!response.ok || disposed) return;
         const payload = await response.json() as { resume?: Pick<ResumeRecord, "lockVersion"> };
-        if (!payload.resume || payload.resume.lockVersion <= autosave.versionRef.current || disposed) return;
-        if (autosave.hasPendingChanges()) {
+        if (!payload.resume || payload.resume.lockVersion <= versionRef.current || disposed) return;
+        if (hasPendingChanges()) {
           setExternalChangeWarning("A newer CV is saved in another tab or ChatGPT. Your local edits were not replaced. Copy them before refreshing.");
         } else {
           window.location.reload();
@@ -106,7 +107,7 @@ export function ResumeEditor({
       window.removeEventListener("focus", checkExternalUpdates);
       window.document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [initialResume.id, previewMode, autosave.hasPendingChanges, autosave.versionRef]);
+  }, [initialResume.id, previewMode, hasPendingChanges, versionRef]);
 
   const updateFittedPreviewScale = useCallback(() => {
     if (previewZoomMode !== "fit-width" && previewZoomMode !== "fit-page") return;
