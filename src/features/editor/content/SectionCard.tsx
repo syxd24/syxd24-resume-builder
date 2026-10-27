@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import type { ResumeDocument, ResumeSection } from "@/domain/resume/schema";
-import { legacySkillsToRichText } from "@/domain/resume/schema";
+import { skillsSectionContent } from "@/domain/resume/schema";
 import {
   appendEntry,
   copyEntry,
@@ -322,7 +322,7 @@ export function SectionCard({
           {section.type === "skills" ? (
             <RichTextEditor
               label="Skills"
-              value={section.content ?? legacySkillsToRichText(section.entries)}
+              value={skillsSectionContent(section)}
               onChange={(content) => onChange(
                 { ...document, sections: document.sections.map((candidate) => candidate.id === section.id ? { ...section, content } : candidate) },
                 { reason: "section-update", sectionId: section.id },

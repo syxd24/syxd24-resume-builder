@@ -382,6 +382,26 @@ export function legacySkillsToRichText(entries: z.infer<typeof skillEntrySchema>
   });
 }
 
+/** Displays older Skills content that stored Markdown source inside plain rich-text blocks. */
+export function skillsSectionContent(section: Extract<ResumeSection, { type: "skills" }>): RichText {
+  if (section.content === undefined) return removeLeadingSkillsHeading(legacySkillsToRichText(section.entries), section.heading);
+  const normalized = section.content.flatMap((block) => {
+    if (block.spans?.some((span) => span.marks.length > 0 || span.href)) return [block];
+    const text = block.spans?.map((span) => span.text).join("") ?? block.text;
+    if (!/(\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_)/.test(text)) return [block];
+    return legacySkillDescription(text).map((parsed) => ({ ...parsed, type: block.type }));
+  });
+  return removeLeadingSkillsHeading(normalized, section.heading);
+}
+
+function removeLeadingSkillsHeading(value: RichText, heading: string): RichText {
+  const first = value[0];
+  const text = first?.spans?.map((span) => span.text).join("") ?? first?.text ?? "";
+  return first?.type === "paragraph" && text.trim().toLocaleLowerCase() === heading.trim().toLocaleLowerCase()
+    ? value.slice(1)
+    : value;
+}
+
 export function createDefaultResumeDocument(): ResumeDocument {
   return resumeDocumentSchema.parse({
     version: 1,

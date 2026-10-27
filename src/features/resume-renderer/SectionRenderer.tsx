@@ -1,7 +1,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 
-import { legacySkillsToRichText, type ResumeDesign, type ResumeSection, type SectionType } from "@/domain/resume";
+import { skillsSectionContent, type ResumeDesign, type ResumeSection, type SectionType } from "@/domain/resume";
 
 import { formatDateRange, formatResumeDate, joinMetadata, safeHref } from "./format";
 import { RichTextContent } from "./RichText";
@@ -130,7 +130,7 @@ function EducationSection({ section, design }: SectionRendererProps & { section:
 function SkillsSection({ section, design }: SectionRendererProps & { section: Extract<ResumeSection, { type: "skills" }> }) {
   return (
     <SectionShell section={section} design={design}>
-      <RichTextContent value={section.content ?? legacySkillsToRichText(section.entries)} />
+      <RichTextContent value={skillsSectionContent(section)} />
     </SectionShell>
   );
 }

@@ -44,5 +44,24 @@ describe("Skills renderer", () => {
 
     expect(screen.getByText("KYC & AML Compliance").closest("strong")).not.toBeNull();
     expect(screen.getByText("KYC/KYB, AML Compliance")).toBeInTheDocument();
+    expect(screen.queryByText("SKILLS", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("formats Markdown source from older Skills rich-text blocks", () => {
+    const section: Extract<ResumeSection, { type: "skills" }> = {
+      id: "legacy-rich-skills",
+      type: "skills",
+      heading: "Skills",
+      visible: true,
+      column: "full",
+      entries: [],
+      content: [{ type: "paragraph", text: "SKILLS\n\n**KYC & AML Compliance**\\\nKYC/KYB, AML Compliance" }],
+    };
+    render(<SectionRenderer section={section} design={defaultResumeDesign} />);
+
+    expect(screen.getByText("KYC & AML Compliance").closest("strong")).not.toBeNull();
+    expect(screen.getByText("KYC/KYB, AML Compliance")).toBeInTheDocument();
+    expect(screen.queryByText("SKILLS", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Skills")).toHaveLength(1);
   });
 });
