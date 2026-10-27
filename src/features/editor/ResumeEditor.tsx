@@ -80,7 +80,7 @@ export function ResumeEditor({
     let checking = false;
     let disposed = false;
     const checkExternalUpdates = async () => {
-      if (checking || document.visibilityState === "hidden") return;
+      if (checking || window.document.visibilityState === "hidden") return;
       checking = true;
       try {
         const response = await fetch(`/api/resumes/${initialResume.id}`, { cache: "no-store" });
@@ -98,13 +98,13 @@ export function ResumeEditor({
         checking = false;
       }
     };
-    const onVisibility = () => { if (document.visibilityState === "visible") void checkExternalUpdates(); };
+    const onVisibility = () => { if (window.document.visibilityState === "visible") void checkExternalUpdates(); };
     window.addEventListener("focus", checkExternalUpdates);
-    document.addEventListener("visibilitychange", onVisibility);
+    window.document.addEventListener("visibilitychange", onVisibility);
     return () => {
       disposed = true;
       window.removeEventListener("focus", checkExternalUpdates);
-      document.removeEventListener("visibilitychange", onVisibility);
+      window.document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [initialResume.id, previewMode, autosave.hasPendingChanges, autosave.versionRef]);
 
