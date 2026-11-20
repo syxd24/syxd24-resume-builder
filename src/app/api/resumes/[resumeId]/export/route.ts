@@ -23,6 +23,9 @@ export async function GET(request: Request, context: { params: Promise<{ resumeI
       },
     });
   } catch (error) {
+    // Keep the public API response generic, but preserve the actual failure in
+    // server-side logs so Chromium/print/auth errors can be diagnosed.
+    console.error("[resume-pdf-export] Failed to generate PDF", error);
     return apiErrorResponse(error);
   }
 }
